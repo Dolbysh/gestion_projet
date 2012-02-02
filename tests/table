@@ -1,0 +1,2 @@
+0 4096 linear /dev/loop1 0
+4096 4096 linear /dev/loop2 0
