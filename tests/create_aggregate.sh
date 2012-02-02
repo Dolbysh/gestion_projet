@@ -1,19 +1,19 @@
 #Create two test disks 
-#dd if=/dev/zero of=/tmp/disk1 bs=1024 seek=2047 count=1
-#dd if=/dev/zero of=/tmp/disk2 bs=1024 seek=2047 count=1
+dd if=/dev/zero of=/tmp/disk1 bs=1024 seek=2047 count=1
+dd if=/dev/zero of=/tmp/disk2 bs=1024 seek=2047 count=1
 
-#losetup /dev/loop1 /tmp/disk1
-#losetup /dev/loop2 /tmp/disk2
+losetup /dev/loop1 /tmp/disk1
+losetup /dev/loop2 /tmp/disk2
 
-#mke2fs /dev/loop1
-#mke2fs /dev/loop2
+mke2fs /dev/loop1
+mke2fs /dev/loop2
 
 #Unmount devices to allow creation of the aggregate
-#umount /dev/loop1
-#umount /dev/loop2
+umount /dev/loop1
+umount /dev/loop2
 
 #Load device mapper 
-#modprobe dm-mod
+modprobe dm-mod
 
 
 #create block devices
