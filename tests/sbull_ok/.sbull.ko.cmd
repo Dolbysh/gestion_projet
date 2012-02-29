@@ -1,1 +1,0 @@
-cmd_/home/duck/Documents/cours/projet/shared/sbull/sbull.ko := ld -r -m elf_i386 -T /usr/src/linux-headers-2.6.32-5-common/scripts/module-common.lds --build-id -o /home/duck/Documents/cours/projet/shared/sbull/sbull.ko /home/duck/Documents/cours/projet/shared/sbull/sbull.o /home/duck/Documents/cours/projet/shared/sbull/sbull.mod.o
