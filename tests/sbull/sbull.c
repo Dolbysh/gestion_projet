@@ -1,9 +1,7 @@
 /***************************************
 A CORRIGER/ A VOIR
-	spinlock_t lock =?
 	u8* data = ?
-	revoir commentaire sbd_request 
-	blk_cleanup_queue inutile ?!
+
 ****************************************/
 
 /*
@@ -48,7 +46,8 @@ static struct request_queue *Queue; /* File de requêtes */
 static struct sbd_device {
 	unsigned long size;	/* Taille du périphérique en secteurs */
 	spinlock_t lock;	/* Spinlock */
-	u8 *data;			/* Le tableau de données */
+	u8 *data1;			/* Le tableau de données 1 */
+	u8 *data2;			/* Le tableau de données 2 */
 	struct gendisk *gd;	/* objet gendisk. Cette structure permettra au noyau d'obtenir d'avantages d'informations sur le périphérique à créer */
 } Device;
 
@@ -60,6 +59,9 @@ static struct sbd_device {
  * résultat sera stocké dans cette dernière. Il s'agit au final de permettre
  * les opérations d'écriture et de lecture.
  */
+ int cpt=0;
+
+
 static void sbd_transfer(struct sbd_device *dev, sector_t sector, unsigned long nsect, char *buffer, int write) {
 	unsigned long offset = sector * logical_block_size; /* Calcul de l'adresse cible */
 	unsigned long nbytes = nsect * logical_block_size; /* Calcul le nombre d'octets */
@@ -69,14 +71,30 @@ static void sbd_transfer(struct sbd_device *dev, sector_t sector, unsigned long 
 		return;
 	}
 	if (write) /* S'il s'agit d'une requête d'écriture */
-		memcpy(dev->data + offset, buffer, nbytes); /* Ecriture à l'offset demandé (data+offset) de nbytes octets (Opération d'écriture)*/
+	{
+		memcpy(dev->data1 + offset, buffer, nbytes); /* Ecriture à l'offset demandé (data+offset) de nbytes octets (Opération d'écriture)*/
+		memcpy(dev->data2 + offset, buffer, nbytes); /* Ecriture à l'offset demandé (data+offset) de nbytes octets (Opération d'écriture)*/
+	}
 	else
-		memcpy(buffer, dev->data + offset, nbytes); /* Copie de data+offset dans buffer sur nbytes octets (Opération de lecture) */
+	{
+		if (cpt == 0 )
+		{
+			memcpy(buffer, dev->data1 + offset, nbytes); /* Copie de data+offset dans buffer sur nbytes octets (Opération de lecture) */
+			printk(KERN_INFO "Lu a partir de segment 1");
+			cpt = 1;
+		}
+		else
+		{
+			memcpy(buffer, dev->data2 + offset, nbytes); /* Copie de data+offset dans buffer sur nbytes octets (Opération de lecture) */
+			printk(KERN_INFO "Lu a partir de segment 2");
+			cpt = 0;
+		}
+	}
 }
 
 /* 
  * Cette fonction permet de sélectionner une requête dans une file
- * donnée (q) et de l'envoyer à la fonction sdb_request afin de la
+ * donnée (q) et de l'envoyer à la fonction sbd_transfert afin de la
  * traiter.
  * Une requête peut être composée de plusieurs "morceaux". Dans cette 
  * fonction, chaque "morceau" de la requête sera traité consécutivement
@@ -137,8 +155,11 @@ static int __init sbd_init(void) {
 	/* Mise en place du phériphérique interne */
 	Device.size = nsectors * logical_block_size; /* Taille de notre périphérique */
 	spin_lock_init(&Device.lock); /* Initialisation du spinlock */
-	Device.data = vmalloc(Device.size); /* Alloue une zone mémoire de la taille du périphérique */
-	if (Device.data == NULL) /* Teste si le tableau de données est vide */
+	Device.data1 = vmalloc(Device.size); /* Alloue la zone mémoire n°1 de la taille du périphérique */
+	if (Device.data1 == NULL) /* Teste si le tableau de données n°1 est vide */
+		return -ENOMEM; /* Retourne l'erreur "Out of Memory" */
+	Device.data2 = vmalloc(Device.size); /* Alloue la zone mémoire n°2 de la taille du périphérique */
+	if (Device.data2 == NULL) /* Teste si le tableau de données n°2 est vide */
 		return -ENOMEM; /* Retourne l'erreur "Out of Memory" */
 	
 	/* Mise en place de la file de requête */
@@ -147,12 +168,12 @@ static int __init sbd_init(void) {
 		goto out; /* Saut à l'instruction out */
 	blk_queue_logical_block_size(Queue, logical_block_size); /* Spécifie la taille des blocs (en octets) de la file  */
 
+	/* Enregistrement auprès du noyau */
 	major_num = register_blkdev(major_num, "sbd"); /* Enregistrement du nouveau périphérique auprès du noyau, à partir de son numéro major et d'un nom de device*/
 	if (major_num <= 0) { /* Si une erreur s'est produite (pas de major number attribué) */
 		printk(KERN_WARNING "sbd: unable to get major number\n"); /* Inscription dans syslog l'avertissement de l'incapacité du noyau à trouver un numéro major  */
 		goto out; /* Saute à l'instruction out */
 	}
-
 	
 	/* Mise en place de la structure GENDISK (gd) */
 	Device.gd = alloc_disk(16); /* Crée la structure et définit le nombre max de minor géré */
@@ -161,7 +182,7 @@ static int __init sbd_init(void) {
 	Device.gd->major = major_num; /* Spécification du numéro major */
 	Device.gd->first_minor = 0; /* Spécification du premier numéro minor. Il permet de connaître le nom du disque à manipuler, si des partitions sont présentes. */
 	Device.gd->fops = &sbd_ops; /* Spécifie les opérations gérées par le périphérique (ioctl, open, release, etc...) */
-	Device.gd->private_data = &Device; /* Pointe vers la structure spécifique à notre périphérique. Seul le driver y aura accès */
+	Device.gd->private_data = &Device; /* Pointe vers la structure spécifique de notre périphérique. Seul le driver y aura accès */
 	strcpy(Device.gd->disk_name, "sbd0"); /* Spécifie le nom du disque du gd créé */
 	set_capacity(Device.gd, nsectors); /* Spécifie la taille du disque en secteurs (%512 octets) */
 	Device.gd->queue = Queue; /* La file du gd pointe vers celle que nous avons créée */
@@ -172,7 +193,8 @@ static int __init sbd_init(void) {
 out_unregister:
 	unregister_blkdev(major_num, "sbd"); /* Désactive l'enregistrement auprès du kernel */
 out:
-	vfree(Device.data); /* Libère l'espace mémoire utilisé par le périphérique */
+	vfree(Device.data1); /* Libère l'espace mémoire n°1 utilisé par le périphérique */
+	vfree(Device.data2); /* Libère l'espace mémoire n°2 utilisé par le périphérique */
 	return -ENOMEM; /* Retourne l'erreur "Out of Memory" */
 }
 
@@ -188,7 +210,8 @@ static void __exit sbd_exit(void)
 	put_disk(Device.gd); /* Il reste cependant la référence dee notre structure dans le noyau. Il faut donc la supprimer. */
 	unregister_blkdev(major_num, "sbd"); /* Désactive l'enregistrement auprès du kernel */
 	blk_cleanup_queue(Queue); /* Vide et désactive la file de requêtes */
-	vfree(Device.data); /* Libère l'espace mémoire utilisée pour la structure*/
+	vfree(Device.data1); /* Libère l'espace mémoire utilisée pour la structure*/
+	vfree(Device.data2); /* Libère l'espace mémoire utilisée pour la structure*/
 }
 
 module_init(sbd_init); /* Initialisation du module */
