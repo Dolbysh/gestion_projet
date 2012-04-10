@@ -1,9 +1,3 @@
-/***************************************
-A CORRIGER/ A VOIR
-	u8* data = ?
-
-****************************************/
-
 /*
  * A sample, extra-simple block driver. Updated for kernel 2.6.31.
  *
@@ -43,13 +37,16 @@ module_param(nsectors, int, 0); /* Nombre de secteurs passé en paramètre au mo
 static struct request_queue *Queue; /* File de requêtes */
 
 /* Structure du périphérique à créer. */
-static struct sbd_device {
+struct sbd_device {
 	unsigned long size;	/* Taille du périphérique en secteurs */
 	spinlock_t lock;	/* Spinlock */
 	u8 *data1;			/* Le tableau de données 1 */
 	u8 *data2;			/* Le tableau de données 2 */
 	struct gendisk *gd;	/* objet gendisk. Cette structure permettra au noyau d'obtenir d'avantages d'informations sur le périphérique à créer */
-} Device;
+};
+
+static struct sbd_device Device;
+
 
 
 /* Traitement d'une requête I/O. */
@@ -118,6 +115,39 @@ static void sbd_request(struct request_queue *q) {
 	}
 }
 
+static int sbull_xfer_bio(struct sbd_device* dev, struct bio* bio){
+    int i;
+    struct bio_vec *bvec;
+    sector_t sector = bio->bi_sector;
+
+    /* Do each segment independently */
+    bio_for_each_segment(bvec, bio, i){
+        char* buffer = __bio_kmap_atomic(bio, i , KM_USER0);
+        sbd_transfer(dev, sector, (bio_cur_bytes(bio)>>9),
+                        buffer, bio_data_dir(bio) == WRITE);
+        sector += bio_cur_bytes(bio)>>9;
+        __bio_kunmap_atomic(bio, KM_USER0);
+    }
+    return 0; /* Always "succeed" */
+}
+
+static int sbull_make_request(struct request_queue *q, struct bio *bio){
+    int status;
+    struct sbd_device *dev = q->queuedata;
+    /* Obtention de l'id du driver du HDD */
+/*    struct block_device* _bi_dev = vmalloc(sizeof(struct block_device));
+    _bi_dev->bd_dev = MKDEV(8,0);
+    bio->bi_bdev = _bi_dev;*/
+    bio->bi_bdev = open_by_devnum(MKDEV(8,0), FMODE_READ|FMODE_WRITE);
+    /* Transfère la requête au device en question */ 
+/*    status = sbull_xfer_bio(dev, bio); */
+    bio_endio(bio, 0);
+    return 1;
+} 
+
+
+
+
 /*
  * Depuis que blkdev_ioctl appelle getgeo au lieu de ioctl, nous devons
  * redéfinir une fonction sbd_getgeo qui spécifie les informations à propos 
@@ -161,11 +191,18 @@ static int __init sbd_init(void) {
 	Device.data2 = vmalloc(Device.size); /* Alloue la zone mémoire n°2 de la taille du périphérique */
 	if (Device.data2 == NULL) /* Teste si le tableau de données n°2 est vide */
 		return -ENOMEM; /* Retourne l'erreur "Out of Memory" */
-	
+
+
 	/* Mise en place de la file de requête */
-	Queue = blk_init_queue(sbd_request, &Device.lock); /* Initialise une file de requête */
+	//Queue = blk_init_queue(sbd_request, &Device.lock); /* Initialise une file de requête */
+    Queue = blk_alloc_queue(GFP_KERNEL);
 	if (Queue == NULL) /* Vérification du succès de la création de la file */
 		goto out; /* Saut à l'instruction out */
+    
+    /* Utile seulement si on ne veut pas utiliser de file de requêtes*/
+    blk_queue_make_request(Queue, sbull_make_request);
+    
+
 	blk_queue_logical_block_size(Queue, logical_block_size); /* Spécifie la taille des blocs (en octets) de la file  */
 
 	/* Enregistrement auprès du noyau */
