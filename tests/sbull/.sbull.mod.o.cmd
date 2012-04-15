@@ -1,7 +1,7 @@
-cmd_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o :=  gcc-4.3 -Wp,-MD,/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/.sbull.mod.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.3.5/include -Iinclude -Iinclude2 -I/usr/src/linux-headers-2.6.32-5-common/include -I/usr/src/linux-headers-2.6.32-5-common/arch/x86/include -include include/linux/autoconf.h   -I/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -fomit-frame-pointer -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -O2  -I/usr/src/linux-headers-2.6.32-5-common/.. -I..  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(sbull.mod)"  -D"KBUILD_MODNAME=KBUILD_STR(sbull)"  -DMODULE -c -o /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.c
+cmd_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o :=  gcc-4.3 -Wp,-MD,/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/.sbull.mod.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.3.5/include -Iinclude -Iinclude2 -I/usr/src/linux-headers-2.6.32-5-common/include -I/usr/src/linux-headers-2.6.32-5-common/arch/x86/include -include include/linux/autoconf.h   -I/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -fstack-protector -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -fomit-frame-pointer -g -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -g  -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(sbull.mod)"  -D"KBUILD_MODNAME=KBUILD_STR(sbull)"  -DMODULE -c -o /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.c
 
-deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o := \
-  /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.c \
+deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o := \
+  /home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.c \
     $(wildcard include/config/module/unload.h) \
   /usr/src/linux-headers-2.6.32-5-common/include/linux/module.h \
     $(wildcard include/config/modules.h) \
@@ -426,6 +426,6 @@ deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbul
   /usr/src/linux-headers-2.6.32-5-common/include/linux/vermagic.h \
   include/linux/utsrelease.h \
 
-/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o: $(deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o)
+/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o: $(deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o)
 
-$(deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull_ok/sbull.mod.o):
+$(deps_/home/duck/Documents/cours/projet/shared/gestion_projet/tests/sbull/sbull.mod.o):
