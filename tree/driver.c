@@ -116,14 +116,14 @@ static int setup_device (struct sbd_device* dev){
 static int __init sbd_init(void) {
 
     /* Enregistrement auprès du noyau */
-    major_num = register_blkdev(major_num, "pbv_"); /* Enregistrement du nouveau périphérique auprès du noyau, à partir de son numéro major et d'un nom de device*/
+    major_num = register_blkdev(0, "pbv"); /* Enregistrement du nouveau périphérique auprès du noyau, à partir de son numéro major et d'un nom de device*/
     if (major_num <= 0) { /* Si une erreur s'est produite (pas de major number attribué) */
         printk(KERN_WARNING "pbv: unable to set major number\n"); /* Inscription dans syslog l'avertissement de l'incapacité du noyau à trouver un numéro major  */
         return -EBUSY;
     }
 
     if (setup_device(&Device) < 0) {
-        unregister_blkdev(major_num, "pbv_");
+        unregister_blkdev(major_num, "pbv");
         return -ENOMEM;
     }
 
@@ -153,7 +153,7 @@ static void __exit sbd_exit (void) {
 
     blkdev_put(Device.target_dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
 
-    unregister_blkdev(major_num, "sbd_"); /* Désactive l'enregistrement auprès du kernel */
+    unregister_blkdev(major_num, "sbd"); /* Désactive l'enregistrement auprès du kernel */
 }
 
 module_init(sbd_init); /* Initialisation du module */
