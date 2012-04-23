@@ -36,7 +36,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
 	static int c = 0;
 	if(bio->bi_rw & REQ_WRITE){
-		struct bio *clone = bio_clone(bio,GFP_WAIT);
+		struct bio *clone = bio_clone(bio,GFP_IOFS);
 		bio->bi_bdev = passthrough->target_dev;
 		clone->bi_bdev = passthrough->target_ssd;
 	} else {
@@ -92,13 +92,13 @@ static int setup_passthrough_device(struct pt_dev *dev, const char *target_name)
 	dev->gd->private_data = dev;
 	dev->gd->flags |= GENHD_FL_EXT_DEVT;
 
-	dev->target_dev = open_by_devnum(MKDEV(8,0), FMODE_READ|FMODE_WRITE|FMODE_EXCL); //blkdev_get_by_path(target_name, FMODE_READ|FMODE_WRITE|FMODE_EXCL, dev);
+	dev->target_dev = bdget(MKDEV(8,16));//blkdev_get_by_path(target_name, FMODE_READ|FMODE_WRITE|FMODE_EXCL, dev);
 	if(!dev->target_dev)
 	{
 		return -1;
 	}
 
-	dev->target_ssd= open_by_devnum(MKDEV(8,0), FMODE_READ|FMODE_WRITE|FMODE_EXCL); //blkdev_get_by_path(target_name, FMODE_READ|FMODE_WRITE|FMODE_EXCL, dev);
+	dev->target_ssd = bdget(MKDEV(8,32));//blkdev_get_by_path(target_name, FMODE_READ|FMODE_WRITE|FMODE_EXCL, dev);
 	if(!dev->target_ssd)
 	{
 		return -1;
@@ -109,7 +109,7 @@ static int setup_passthrough_device(struct pt_dev *dev, const char *target_name)
 		return -1;
 	}
 
-	if(!dev->target_dev->bd_disk)
+	if(!dev->target_ssd->bd_disk)
 	{
 		return -1;
 	}
