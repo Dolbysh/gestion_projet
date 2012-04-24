@@ -185,12 +185,13 @@ static void __exit sbd_exit (void) {
         put_disk(Device.gd);
     }
 
-    if (Device.queue) 
-       blk_cleanup_queue(Device.queue); /* Vide et désactive la file de requêtes */
+    if (Device.queue){
+        blk_cleanup_queue(Device.queue); /* Vide et désactive la file de requêtes */
+    }
 
     blkdev_put(Device.target_dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
 
-    unregister_blkdev(major_num, "sbd"); /* Désactive l'enregistrement auprès du kernel */
+    unregister_blkdev(major_num, "pbv"); /* Désactive l'enregistrement auprès du kernel */
 }
 
 module_init(sbd_init); /* Initialisation du module */
