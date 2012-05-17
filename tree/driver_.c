@@ -20,11 +20,11 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 
 
-#define MAJOR_SSD 42 /* Major du disque SSD avec lequel on va dialoguer */
-#define MINOR_SSD 42 /* Minor du disque SSD avec lequel on va dialoguer */
+#define MAJOR_SSD 7 /* Major du disque SSD avec lequel on va dialoguer */
+#define MINOR_SSD 0 /* Minor du disque SSD avec lequel on va dialoguer */
 
-#define MAJOR_HDD 8 /* Major du disque HDD avec lequel on va dialoguer */
-#define MINOR_HDD 0 /* Minor du disque HDD avec lequel on va dialoguer */
+#define MAJOR_HDD 7 /* Major du disque HDD avec lequel on va dialoguer */
+#define MINOR_HDD 1 /* Minor du disque HDD avec lequel on va dialoguer */
 
 static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
 
@@ -32,7 +32,7 @@ static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attributio
 struct sbd_device {
     struct request_queue *queue; /* File de requêtes */
 	struct gendisk *gd;	/* Cette structure permettra au noyau d'obtenir d'avantages d'informations sur le périphérique à créer */
-    struct block_device *target_dev; /* Disque dur avec lequel nous souhaitons communiquer (HDD pour l'instant) */
+    struct block_device *target_hdd; /* Disque dur avec lequel nous souhaitons communiquer (HDD pour l'instant) */
 	struct block_device *target_ssd;
 };
 
@@ -45,8 +45,26 @@ static struct sbd_device Device;
  * traitera la bio.
  * Cette fonction est appellée implicitement par le noyau
  */
+static int passthrough_make_request(struct request_queue *q, struct bio *bio)
+{
+    int request_type = bio_data_dir(bio);
+
+    if (request_type == READ){
+        printk(KERN_WARNING "Make request : READ \n");
+        bio->bi_bdev = Device.target_hdd;
+    } else if(request_type == WRITE){
+        struct bio *clone = bio_clone(bio,GFP_KERNEL);
+        clone->bi_bdev = Device.target_ssd;
+        printk(KERN_WARNING "Make request : WRITE BEGIN \n");
+        generic_make_request(bio);
+        bio->bi_bdev = Device.target_hdd;
+        printk(KERN_WARNING "Make request : WRITE END \n");
+    }
+    return 1;
+}
+
 static int sbull_make_request(struct request_queue *q, struct bio *bio){
-    bio->bi_bdev = Device.target_dev; /* Remplacement du pilote */
+    bio->bi_bdev = Device.target_hdd; /* Remplacement du pilote */
     return 1;
 } 
 
@@ -85,19 +103,38 @@ static struct block_device_operations sbd_ops = {
 static int setup_device (struct sbd_device* dev){
     struct request_queue *q;
 
+    dev->target_hdd = vmalloc(sizeof(struct block_device));
 
-    dev->queue = blk_alloc_queue(GFP_KERNEL); /* Création de la file de requête  */
-    if (dev->queue == NULL) /* Vérification du succès de la création de la file */
-        return -1; 
-
-    /* Remplace la fonction de traitement des requêtes de la file */
-    blk_queue_make_request(dev->queue, sbull_make_request);
-
-    dev->gd = alloc_disk(1); /* Crée la structure et définit le nombre max de minor géré */
-    if (!dev->gd){ /* Test pour la création de la structure */
+    if (dev->target_hdd == NULL){
+        printk(KERN_WARNING "----------dev");
         return -1;
     }
 
+    dev->target_ssd = vmalloc(sizeof(struct block_device));
+
+    if (dev->target_ssd == NULL){
+        printk(KERN_WARNING "----------ssd");
+        return -1;
+    }
+
+    dev->queue = blk_alloc_queue(GFP_KERNEL); /* Création de la file de requête  */
+    if (dev->queue == NULL){ /* Vérification du succès de la création de la file */
+        printk(KERN_WARNING "blk_alloc_queue FAILED");
+        return -1; 
+    }
+    printk(KERN_WARNING "blk_alloc_queue DONE");
+
+    /* Remplace la fonction de traitement des requêtes de la file */
+    blk_queue_make_request(dev->queue, passthrough_make_request);
+    printk(KERN_WARNING "blk_queue_make_request DONE");
+
+    dev->gd = alloc_disk(1); /* Crée la structure et définit le nombre max de minor géré */
+    if (!dev->gd){ /* Test pour la création de la structure */
+    printk(KERN_WARNING "alloc_disk FAILED");
+        return -1;
+    }
+
+    printk(KERN_WARNING "alloc_disk DONE");
     dev->gd->major = major_num; /* Spécification du numéro major */
     dev->gd->first_minor = 0; /* Spécification du premier numéro minor. Définit le numéro du disque */
     dev->gd->fops = &sbd_ops; /* Spécifie les opérations gérées par le périphérique (ioctl, open, release, read,  etc...) */
@@ -107,19 +144,30 @@ static int setup_device (struct sbd_device* dev){
     strcpy(dev->gd->disk_name, "pbv"); /* Spécifie le nom du disque créé */
 
     /* Accéde à la struct du périphérique par le biais d'un couple major/minor */
-    dev->target_dev = bdget(MKDEV(MAJOR_HDD,MINOR_HDD));
+    dev->target_hdd = open_by_devnum(MKDEV(MAJOR_HDD,MINOR_HDD), FMODE_READ|FMODE_WRITE|FMODE_EXCL); /* bdget(MKDEV(MAJOR_HDD,MINOR_HDD)); */
     /* Test si l'ouverture à été effectuée */
-    if (!dev->target_dev || !dev->target_dev->bd_disk)
+    if (!dev->target_hdd || !dev->target_hdd->bd_disk){
+        printk(KERN_WARNING "bdget hdd FAILED");
         return -1;
-	//dev->target_ssd = bdget(MKDEV(8,32));
-	
-    /*if (!dev->target_ssd || !dev->target_ssd->bd_disk)
-	return -1;*/
+    }
+    printk(KERN_WARNING "bdget hdd DONE");
+
+    dev->target_ssd = open_by_devnum(MKDEV(MAJOR_SSD,MINOR_SSD), FMODE_READ|FMODE_WRITE|FMODE_EXCL); /*bdget(MKDEV(8,16));*/
+
+    if (!dev->target_ssd || !dev->target_ssd->bd_disk){
+    printk(KERN_WARNING "bdget ssd FAILED");
+        return -1;
+    }
+    printk(KERN_WARNING "bdget ssd DONE");
+
     /* Récupération de la file de requête du HDD */
-    q = bdev_get_queue(dev->target_dev);
+    q = bdev_get_queue(dev->target_ssd);
     /* Test si erreur */
-    if(!q)
+    if(!q){
+        printk(KERN_WARNING "bdev_get_queue FAILED");
         return -1;
+    }
+    printk(KERN_WARNING "bdev_get_queue DONE");
 
     /* 
      * Mise en place des informations de la file de requêtes du gendisk 
@@ -138,10 +186,11 @@ static int setup_device (struct sbd_device* dev){
      * */
 
     /* Fixe la taille du périphérique à celle du périphérique HDD */
-    set_capacity(dev->gd, get_capacity(dev->target_dev->bd_disk));
+    set_capacity(dev->gd, get_capacity(dev->target_ssd->bd_disk));
 
     /* Ajoute le gd aux disques actifs. Il pourra être manipulé par le système */
     add_disk(dev->gd);
+    printk(KERN_WARNING "add_disk DONE");
 
     return 0;
 }
@@ -155,8 +204,12 @@ static int setup_device (struct sbd_device* dev){
  */
 static int __init sbd_init(void) {
 
+    printk(KERN_WARNING "BEGIN init");
     /* Enregistrement auprès du noyau */
+
     major_num = register_blkdev(0, "pbv"); /* Enregistrement du nouveau disque auprès du noyau, grâce à un numéro major et un nom*/
+    printk(KERN_WARNING "register_blkdev DONE");
+
     if (major_num <= 0) { /* Si une erreur s'est produite (pas de major number attribué) */
         printk(KERN_WARNING "pbv: unable to set major number\n"); /* Inscription dans syslog de l'incapacité du noyau à trouver un major  */
         return -EBUSY;
@@ -164,10 +217,12 @@ static int __init sbd_init(void) {
 
     /* Configure notre pilote et test le retour de notre fonction */
     if (setup_device(&Device) < 0) {
+        printk(KERN_WARNING "setup_device FAILED");
         unregister_blkdev(major_num, "pbv");
         return -ENOMEM;
     }
 
+    printk(KERN_WARNING "END init");
     return 0;
 }
 
@@ -189,11 +244,14 @@ static void __exit sbd_exit (void) {
     }
 
     if (Device.queue) 
-       blk_cleanup_queue(Device.queue); /* Vide et désactive la file de requêtes */
+        blk_cleanup_queue(Device.queue); /* Vide et désactive la file de requêtes */
 
-    blkdev_put(Device.target_dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
-    blkdev_put(Device.target_ssd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
-    unregister_blkdev(major_num, "sbd"); /* Désactive l'enregistrement auprès du kernel */
+    if (Device.target_hdd)
+        blkdev_put(Device.target_hdd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+
+    if (Device.target_ssd)
+        blkdev_put(Device.target_ssd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+    unregister_blkdev(major_num, "pbv"); /* Désactive l'enregistrement auprès du kernel */
 }
 
 module_init(sbd_init); /* Initialisation du module */
