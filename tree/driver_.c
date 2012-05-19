@@ -53,21 +53,15 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
         printk(KERN_WARNING "Make request : READ \n");
         bio->bi_bdev = Device.target_hdd;
     } else if(request_type == WRITE){
+        printk(KERN_WARNING "Make request : WRITE BEGIN \n");
         struct bio *clone = bio_clone(bio,GFP_KERNEL);
         clone->bi_bdev = Device.target_ssd;
-        printk(KERN_WARNING "Make request : WRITE BEGIN \n");
-        generic_make_request(bio);
         bio->bi_bdev = Device.target_hdd;
+        generic_make_request(clone);
         printk(KERN_WARNING "Make request : WRITE END \n");
     }
     return 1;
 }
-
-static int sbull_make_request(struct request_queue *q, struct bio *bio){
-    bio->bi_bdev = Device.target_hdd; /* Remplacement du pilote */
-    return 1;
-} 
-
 
 /* 
  * Fonction spécifiant les informations à propos de la géométrie du disque
