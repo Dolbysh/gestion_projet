@@ -11,4 +11,4 @@ typedef struct free_sector {
 
 int get_line();
 void free_one_line();
-void init_free_sector(int size, int occup_max, int occup_min, int first_to_delete, int first_to_use, int first_usable, int last_usable);
+void init_free_sector(int size, int occup_max, int occup_min, int first_line, int last_usable);
