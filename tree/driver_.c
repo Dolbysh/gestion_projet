@@ -133,8 +133,9 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 				pthread(ssd_transfer(sector,clone));
 				add_node(sector, bio->bi_sector);
 			} else {
-			pthread(ssd_transfer(n->lba_ssd,clone));
-			printk(KERN_WARNING "Make request : WRITE END \n");
+				pthread(ssd_transfer(n->lba_ssd,clone));
+				printk(KERN_WARNING "Make request : WRITE END \n");
+			}
 			break;
 		case ECONOMIE:
 			sector = get_line();
@@ -148,6 +149,8 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
     }
 
     if(HASH_COUNT(mapping) >= mem_ssd->occupy_max){
+	ssd_empty();
+	}
 	
     return 1;
 }
