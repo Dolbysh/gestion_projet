@@ -24,9 +24,10 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 
-#define LINE_SIZE 1
-#define TAUX_MIN 70
-#define TAUX_MAX 90
+#define LINE_SIZE 1 /* Taille d'une ligne */
+#define TAUX_MIN 70 /* Taux d'occupation au dessous duquel 
+on doit revenir lors d'une procédure de vidage du SSD */
+#define TAUX_MAX 90 /* Taux d'occupation maximal du SSD */
 
 #define MAJOR_SSD 7 /* Major du disque SSD avec lequel on va dialoguer */
 #define MINOR_SSD 0 /* Minor du disque SSD avec lequel on va dialoguer */
@@ -55,19 +56,20 @@ struct sbd_device {
 /* Structure de notre pilote */
 static struct sbd_device Device;
 
-
-
-/*fonction d'aide*/
+/* fonctions d'aide */
+/* Premier secteur de la dernière ligne utilisable sur le SSD */
 u64 compute_last_usable(u64 i){
 	return (u64) floor(i / LINE_SIZE) * LINE_SIZE - LINE_SIZE + 1 ;
 }
 
+/* Nombre maximal de lignes pouvant être utilisées sur le SSD */
 u64 compute_max(u64 i){
-	return (u64) floor(i * TAUX_MAX / LINE_SIZE * 100);
+	return (u64) floor(i * TAUX_MAX / (LINE_SIZE * 100));
 }
 
+/* Nombre de lignes utilisées sur le SSD en dessous duquel il faut arriver après l'avoir vidé */
 u64 compute_min(u64 i){
-	return (u64) floor(i * TAUX_MIN / LINE_SIZE * 100);
+	return (u64) floor(i * TAUX_MIN / (LINE_SIZE * 100));
 }
 
 void ssd_transfer(int sector, struct bio *bio){
@@ -76,9 +78,23 @@ void ssd_transfer(int sector, struct bio *bio){
 	generic_make_request(clone);
 }
 
-
-
-void ssd_empty(){
+/* Fonction appelée lorsque le SSD est trop rempli => transfert d'une partie du SSD vers le HDD */
+void ssd_empty(size_ssd){
+	int nb_max = compute_max(size_ssd);
+	int nb_min = compute_min(size_ssd);
+	int nb_to_delete = nb_max - nb_min;
+	for (i = 0; i < nb_to_delete; i++) {
+		u64 lba = mem_SSD->first_to_delete;
+		/*transférer ligne SSD vers HDD*/
+		/*si secteurs modifiés -> copie sur HDD
+		  Sinon rien*/
+		/////////////////// TO DO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+		
+		/*supprimer ligne de la table de hachage*/
+		free_one_line();
+		/*décaler les pointeurs de mem_SSD */
+		free_one_line();
+	}
 }		
 
 /* 
@@ -89,36 +105,40 @@ void ssd_empty(){
 static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
     int request_type = bio_data_dir(bio);
-
+	node* n = find_item(...);
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
-	int offset = bio->bi_sector;
-	node* n = find_item(...)
-	if (n == NULL){
-		bio->bi_bdev = Device.target_hdd;
-		struct bio *clone = bio_clone(bio,GFP_KERNEL);
-		sector = alloc_a_line();
-		clone->bi_rw = WRITE;	
-        	pthread(ssd_transfer(sector,clone));
-		add_node(sector, bio->bi_sector);
-	else {
-		bio->bi_bdev = Device.target_ssd;
-		bio->bi_sector = n->lba_ssd;	
-	}
-    } else if(request_type == WRITE){
-	switch(mode){
+		int offset = bio->bi_sector;
+		
+		if (n == NULL){
+			bio->bi_bdev = Device.target_hdd;
+			struct bio *clone = bio_clone(bio, GFP_KERNEL);
+			sector = alloc_a_line();
+			clone->bi_rw = WRITE;
+		    pthread(ssd_transfer(sector,clone));
+			add_node(sector, bio->bi_sector);
+		} else {
+			bio->bi_bdev = Device.target_ssd;
+			bio->bi_sector = n->lba_ssd;	
+		}
+    } else if (request_type == WRITE){
+	switch (mode) {
 		case SECURITE:
 			printk(KERN_WARNING "Make request : WRITE BEGIN \n");
 			struct bio *clone = bio_clone(bio,GFP_KERNEL);
 			bio->bi_bdev = Device.target_hdd;
-			sector = alloc_a_line();
-			pthread(ssd_transfer(sector,clone));
-			add_node(sector, bio->bi_sector);
+			if (n == NULL) {
+				sector = alloc_a_line();
+				pthread(ssd_transfer(sector,clone));
+				add_node(sector, bio->bi_sector);///////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\
+			}
+			//////////////////// TO DO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 			printk(KERN_WARNING "Make request : WRITE END \n");
 			break;
 		case ECONOMIE:
-			sector = alloc_a_line();
-			pthread(ssd_transfer(sector,clone));
+			sector = get_line();
+			///////////////////////////////TO DO\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ réserver place sur HDD
+			pthread(ssd_transfer(sector,clone));////////////////////_\\\\\\\\\\\\\\\\\ 
 			add_node(sector, -1);
 			break;	
 		default:
