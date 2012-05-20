@@ -4,6 +4,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
+#include <pthread.h>
 
 #include <linux/kernel.h> /* printk() */
 #include <linux/fs.h>     /* everything... */
@@ -15,7 +16,10 @@
 #include <linux/hdreg.h>
 #include <linux/kdev_t.h>
 #include <linux/timer.h>
+#include "mapping.h"
+#include "free_line.c"
 
+#include 
 MODULE_LICENSE("Dual BSD/GPL");
 
 
@@ -25,6 +29,14 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 #define MAJOR_HDD 7 /* Major du disque HDD avec lequel on va dialoguer */
 #define MINOR_HDD 1 /* Minor du disque HDD avec lequel on va dialoguer */
+
+
+/*Mode de fonctionnement*/
+
+#define SECURITE 0 /* On écrit sur les deux disques systématiquement */ 
+#define ECONOMIE 1 /* On écrit uniquement sur les SSD */
+
+static int mode = SECURITE;
 
 static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
 
@@ -39,6 +51,14 @@ struct sbd_device {
 /* Structure de notre pilote */
 static struct sbd_device Device;
 
+void ssd_transfer(int sector, struct bio *bio){
+	bio->bi_bdev = Device.target_ssd;
+	bio->bi_sector = sector;
+	generic_make_request(clone);
+}
+
+void ssd_empty(){
+		
 
 /* 
  * Fonction permettant de rediriger la requête en remplaçant le pilote qui 
@@ -51,15 +71,42 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
-        bio->bi_bdev = Device.target_hdd;
+	int offset = bio->bi_sector;
+	node* n = find_item(...)
+	if (n == NULL){
+		bio->bi_bdev = Device.target_hdd;
+		struct bio *clone = bio_clone(bio,GFP_KERNEL);
+		sector = alloc_a_line();
+		clone->bi_rw = WRITE;	
+        	pthread(ssd_transfer(sector,clone));
+		add_node(sector, bio->bi_sector);
+	else {
+		bio->bi_bdev = Device.target_ssd;
+		bio->bi_sector = n->lba_ssd;	
+	}
     } else if(request_type == WRITE){
-        printk(KERN_WARNING "Make request : WRITE BEGIN \n");
-        struct bio *clone = bio_clone(bio,GFP_KERNEL);
-        clone->bi_bdev = Device.target_ssd;
-        bio->bi_bdev = Device.target_hdd;
-        generic_make_request(clone);
-        printk(KERN_WARNING "Make request : WRITE END \n");
+	switch(mode){
+		case SECURITE:
+			printk(KERN_WARNING "Make request : WRITE BEGIN \n");
+			struct bio *clone = bio_clone(bio,GFP_KERNEL);
+			bio->bi_bdev = Device.target_hdd;
+			sector = alloc_a_line();
+			pthread(ssd_transfer(sector,clone));
+			add_node(sector, bio->bi_sector);
+			printk(KERN_WARNING "Make request : WRITE END \n");
+			break;
+		case ECONOMIE:
+			sector = alloc_a_line();
+			pthread(ssd_transfer(sector,clone));
+			add_node(sector, -1);
+			break;	
+		default:
+			printk(KERN_WARNING "Make request : Mode inattendu \n");
+			return -1;
+	}
     }
+
+    Ajout code vérification seuil
     return 1;
 }
 
@@ -154,7 +201,8 @@ static int setup_device (struct sbd_device* dev){
     }
     printk(KERN_WARNING "bdget ssd DONE");
 
-    /* Récupération de la file de requête du HDD */
+    /* Récupération de la file de requête du HDD et du SSD */
+    q1 = bdev_get_queue(dev->target_hdd);	
     q = bdev_get_queue(dev->target_ssd);
     /* Test si erreur */
     if(!q){
@@ -163,9 +211,13 @@ static int setup_device (struct sbd_device* dev){
     }
     printk(KERN_WARNING "bdev_get_queue DONE");
 
+    if (q->limits.max_sectors > q1->limits.max_sectors){
+	 printk(KERN_WARNING "setup_device: SSD de taille supérieure au HDD");	
+	 return -1;
+	}
     /* 
      * Mise en place des informations de la file de requêtes du gendisk 
-     * Elle devra théoriquement cloner celle du HDD
+     * Elle devra théoriquement cloner celle du SSD
      */
     dev->gd->queue->limits.max_hw_sectors      = q->limits.max_hw_sectors;
     dev->gd->queue->limits.max_sectors         = q->limits.max_sectors;
