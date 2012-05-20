@@ -5,6 +5,7 @@
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <pthread.h>
+#include <math.h>
 
 #include <linux/kernel.h> /* printk() */
 #include <linux/fs.h>     /* everything... */
@@ -23,6 +24,9 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 
+#define LINE_SIZE 1
+#define TAUX_MIN 70
+#define TAUX_MAX 90
 
 #define MAJOR_SSD 7 /* Major du disque SSD avec lequel on va dialoguer */
 #define MINOR_SSD 0 /* Minor du disque SSD avec lequel on va dialoguer */
@@ -51,14 +55,31 @@ struct sbd_device {
 /* Structure de notre pilote */
 static struct sbd_device Device;
 
+
+
+/*fonction d'aide*/
+u64 compute_last_usable(u64 i){
+	return (u64) floor(i / LINE_SIZE) * LINE_SIZE - LINE_SIZE + 1 ;
+}
+
+u64 compute_max(u64 i){
+	return (u64) floor(i * TAUX_MAX / LINE_SIZE * 100);
+}
+
+u64 compute_min(u64 i){
+	return (u64) floor(i * TAUX_MIN / LINE_SIZE * 100);
+}
+
 void ssd_transfer(int sector, struct bio *bio){
 	bio->bi_bdev = Device.target_ssd;
 	bio->bi_sector = sector;
 	generic_make_request(clone);
 }
 
+
+
 void ssd_empty(){
-		
+}		
 
 /* 
  * Fonction permettant de rediriger la requête en remplaçant le pilote qui 
@@ -236,6 +257,11 @@ static int setup_device (struct sbd_device* dev){
 
     /* Ajoute le gd aux disques actifs. Il pourra être manipulé par le système */
     add_disk(dev->gd);
+
+    /*On initialise notre structure free_sectors */
+    u64 disk_size = q1->limits.max_sectors;
+    	
+    void init_free_sector(1, occup_max(disk_size), compute_min(disk_size), 11, compute_last_usable(disk_size));
     printk(KERN_WARNING "add_disk DONE");
 
     return 0;
