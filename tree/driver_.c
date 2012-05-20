@@ -18,7 +18,7 @@
 #include <linux/kdev_t.h>
 #include <linux/timer.h>
 #include "mapping.h"
-#include "free_line.c"
+#include "free_sectors.c"
 
 #include 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -79,7 +79,7 @@ void ssd_transfer(int sector, struct bio *bio){
 }
 
 /* Fonction appelée lorsque le SSD est trop rempli => transfert d'une partie du SSD vers le HDD */
-void ssd_empty(size_ssd){
+void ssd_empty(){
 	int nb_max = compute_max(size_ssd);
 	int nb_min = compute_min(size_ssd);
 	int nb_to_delete = nb_max - nb_min;
@@ -105,7 +105,8 @@ void ssd_empty(size_ssd){
 static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
     int request_type = bio_data_dir(bio);
-	node* n = find_item(...);
+    sector_t offset = bio->bi_sector;
+    node* n = find_item(offset);
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
 		int offset = bio->bi_sector;
@@ -115,7 +116,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			struct bio *clone = bio_clone(bio, GFP_KERNEL);
 			sector = alloc_a_line();
 			clone->bi_rw = WRITE;
-		    pthread(ssd_transfer(sector,clone));
+		        pthread(ssd_transfer(sector,clone));
 			add_node(sector, bio->bi_sector);
 		} else {
 			bio->bi_bdev = Device.target_ssd;
@@ -130,15 +131,14 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			if (n == NULL) {
 				sector = alloc_a_line();
 				pthread(ssd_transfer(sector,clone));
-				add_node(sector, bio->bi_sector);///////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\
-			}
-			//////////////////// TO DO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+				add_node(sector, bio->bi_sector);
+			} else {
+			pthread(ssd_transfer(n->lba_ssd,clone));
 			printk(KERN_WARNING "Make request : WRITE END \n");
 			break;
 		case ECONOMIE:
 			sector = get_line();
-			///////////////////////////////TO DO\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ réserver place sur HDD
-			pthread(ssd_transfer(sector,clone));////////////////////_\\\\\\\\\\\\\\\\\ 
+			pthread(ssd_transfer(sector,clone));
 			add_node(sector, -1);
 			break;	
 		default:
@@ -147,7 +147,8 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 	}
     }
 
-    Ajout code vérification seuil
+    if(HASH_COUNT(mapping) >= mem_ssd->occupy_max){
+	
     return 1;
 }
 
