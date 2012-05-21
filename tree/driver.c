@@ -80,20 +80,17 @@ void ssd_transfer(int sector, struct bio *bio){
 
 /* Fonction appelée lorsque le SSD est trop rempli => transfert d'une partie du SSD vers le HDD */
 void ssd_empty(){
-	int nb_max = compute_max(size_ssd);
-	int nb_min = compute_min(size_ssd);
-	int nb_to_delete = nb_max - nb_min;
+	node* n = mapping;
+	node* temp = NULL;
+	int nb_to_delete = mem_SSD.occup_max - mem_SSD.occup_min;
 	for (i = 0; i < nb_to_delete; i++) {
-		u64 lba = mem_SSD->first_to_delete;
-		/*transférer ligne SSD vers HDD*/
-		/*si secteurs modifiés -> copie sur HDD
-		  Sinon rien*/
-		/////////////////// TO DO \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-		
-		/*supprimer ligne de la table de hachage*/
+		temp = n->hh.next;
+		del_node(n);
+		n = temp;
+		if (n == NULL) break;
+		////rajouter code pour le mode économie
 		free_one_line();
 		/*décaler les pointeurs de mem_SSD */
-		free_one_line();
 	}
 }		
 
@@ -117,7 +114,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			sector = alloc_a_line();
 			clone->bi_rw = WRITE;
 		        pthread(ssd_transfer(sector,clone));
-			add_node(sector, bio->bi_sector);
+			add_node(offset, sector);
 		} else {
 			bio->bi_bdev = Device.target_ssd;
 			bio->bi_sector = n->lba_ssd;	
@@ -131,7 +128,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			if (n == NULL) {
 				sector = alloc_a_line();
 				pthread(ssd_transfer(sector,clone));
-				add_node(sector, bio->bi_sector);
+				add_node(offset, sector);
 			} else {
 				pthread(ssd_transfer(n->lba_ssd,clone));
 				printk(KERN_WARNING "Make request : WRITE END \n");
@@ -139,8 +136,8 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			break;
 		case ECONOMIE:
 			sector = get_line();
-			pthread(ssd_transfer(sector,clone));
-			add_node(sector, -1);
+			pthread(ssd_transfer(sector,bio));
+			add_node(offset,sector);
 			break;	
 		default:
 			printk(KERN_WARNING "Make request : Mode inattendu \n");
