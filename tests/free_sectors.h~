@@ -13,6 +13,10 @@ typedef struct FREESECTOR {
        uint64_t last_usable; /*lba du dernier sector à disposition du mapping sur le SSD*/
 } free_sector;
 
+#ifndef MEM_SSD
+#define MEM_SSD
+#endif
+
 uint64_t get_line();
 void free_one_line();
 void init_free_sector(uint64_t size, uint64_t occup_max, uint64_t occup_min, uint64_t first_line, uint64_t last_usable);

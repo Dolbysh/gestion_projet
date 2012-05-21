@@ -1,19 +1,14 @@
-//#include "mapping.h"
 #include "free_sectors.h"
+#include "mapping.h"
 #include <stdio.h>
 
-extern free_sector *mem_SSD;
+extern free_sector mem_SSD;
 
 int main() {
-		
 	//tests free_sectors.c;
 	init_free_sector(42, 70, 60, 10, 67);
-//	free_sector *mem_SSD == NULL;
-	if (mem_SSD != NULL)
-		printf("mem_SSD->size = %llu", mem_SSD->size_line);
-	else
-		printf("Try again...!");
-			
+	printf("mem_SSD->size = %llu", mem_SSD.size_line);
+
 	/*
 	if (mem_SSD != NULL) {
 		printf("size : %llu", mem_SSD->size_line);
@@ -43,15 +38,4 @@ int main() {
 	if ((i1 == NULL) && (i2 == NULL)) {
 		printf("Bazinga²! \n");
 	}*/
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 }
