@@ -113,7 +113,9 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			struct bio *clone = bio_clone(bio, GFP_KERNEL);
 			sector = alloc_a_line();
 			clone->bi_rw = WRITE;
-		        pthread(ssd_transfer(sector,clone));
+		        if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
+   				printk(KERN_WARNING "pthread_create failed");
+			}
 			add_node(offset, sector);
 		} else {
 			bio->bi_bdev = Device.target_ssd;
@@ -127,16 +129,22 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 			bio->bi_bdev = Device.target_hdd;
 			if (n == NULL) {
 				sector = alloc_a_line();
-				pthread(ssd_transfer(sector,clone));
+				if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
+   					printk(KERN_WARNING "pthread_create failed");
+				}
 				add_node(offset, sector);
 			} else {
-				pthread(ssd_transfer(n->lba_ssd,clone));
+				if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
+   					printk(KERN_WARNING "pthread_create failed");
+				}	
 				printk(KERN_WARNING "Make request : WRITE END \n");
 			}
 			break;
 		case ECONOMIE:
 			sector = get_line();
-			pthread(ssd_transfer(sector,bio));
+			if (pthread_create(&thread, NULL, ssd_transfer, sector, bio)) {
+   				printk(KERN_WARNING "pthread_create failed");
+			}
 			add_node(offset,sector);
 			break;	
 		default:
