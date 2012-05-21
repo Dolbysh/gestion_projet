@@ -51,12 +51,14 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
         bio->bi_bdev = Device.target_hdd;
+        printk(KERN_WARNING "LBA %llu\n", bio->bi_sector);
     } else if(request_type == WRITE){
         printk(KERN_WARNING "Make request : WRITE BEGIN \n");
         struct bio *clone = bio_clone(bio,GFP_KERNEL);
         clone->bi_bdev = Device.target_ssd;
         bio->bi_bdev = Device.target_hdd;
         generic_make_request(clone);
+        printk(KERN_WARNING "LBA %llu\n", bio->bi_sector);
         printk(KERN_WARNING "Make request : WRITE END \n");
     }
     return 1;
