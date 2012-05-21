@@ -15,11 +15,5 @@ default:
 clean:
 	$(MAKE) -I/usr/include -C $(KDIR) SUBDIRS=$(PWD) clean
 	rm -f *.mod *.ko test_ssd test_hdd
-
-    ifeq ($(loop0_attached), 1)
-      $(shell losetup -d /dev/loop0)
-    endif
-
-    ifeq ($(loop1_attached), 1)
-      $(shell losetup -d /dev/loop1)
-    endif
+	$(shell losetup -d /dev/loop0 2>/dev/null)
+	$(shell losetup -d /dev/loop1 2>/dev/null)
