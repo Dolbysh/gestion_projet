@@ -14,16 +14,18 @@
 #include <linux/hdreg.h>
 #include <linux/kdev_t.h>
 #include <linux/timer.h>
+#include "free_sectors.h"
+#include "mapping.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 
 
 
-#define MAJOR_SSD 7 /* Major du disque SSD avec lequel on va dialoguer */
-#define MINOR_SSD 0 /* Minor du disque SSD avec lequel on va dialoguer */
+static int MAJOR_SSD = 7; /* Major du disque SSD avec lequel on va dialoguer */
+static int MINOR_SSD = 0; /* Minor du disque SSD avec lequel on va dialoguer */
 
-#define MAJOR_HDD 7 /* Major du disque HDD avec lequel on va dialoguer */
-#define MINOR_HDD 1 /* Minor du disque HDD avec lequel on va dialoguer */
+static int MAJOR_HDD = 7; /* Major du disque HDD avec lequel on va dialoguer */
+static int MINOR_HDD = 1; /* Minor du disque HDD avec lequel on va dialoguer */
 
 static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
 
@@ -199,6 +201,11 @@ static int setup_device (struct sbd_device* dev){
  */
 static int __init sbd_init(void) {
 
+    node* n = NULL;
+    add_node(42,42);
+    n =find_item(42);
+    printk(KERN_WARNING "test mapping %llu", n->lba_ssd);
+
     printk(KERN_WARNING "BEGIN init");
     /* Enregistrement auprès du noyau */
 
@@ -227,6 +234,7 @@ static int __init sbd_init(void) {
  * désinscription du module du kernel.
  */
 static void __exit sbd_exit (void) {
+    printk(KERN_WARNING "lol");
     if (Device.gd){
         /* Supprime toutes les informations associées à la structure gendisk (et
          * donc, au disque). Après cette action, le périphérique ne pourra plus 
@@ -247,7 +255,13 @@ static void __exit sbd_exit (void) {
     if (Device.target_ssd)
         blkdev_put(Device.target_ssd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
     unregister_blkdev(major_num, "pbv"); /* Désactive l'enregistrement auprès du kernel */
+    printk(KERN_WARNING "lol");
 }
 
+/*module_param (MAJOR_HDD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param (MINOR_HDD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param (MAJOR_SSD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+module_param (MINOR, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+*/
 module_init(sbd_init); /* Initialisation du module */
 module_exit(sbd_exit); /* Désactivation du module */

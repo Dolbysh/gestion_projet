@@ -1,11 +1,9 @@
-
 #include <asm/uaccess.h>
 #include <linux/bio.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
-#include <pthread.h>
-#include <math.h>
+#include <linux/kthread.h>
 
 #include <linux/kernel.h> /* printk() */
 #include <linux/fs.h>     /* everything... */
@@ -18,9 +16,8 @@
 #include <linux/kdev_t.h>
 #include <linux/timer.h>
 #include "mapping.h"
-#include "free_sectors.c"
+#include "free_sectors.h"
 
-#include 
 MODULE_LICENSE("Dual BSD/GPL");
 
 
@@ -41,6 +38,9 @@ on doit revenir lors d'une procédure de vidage du SSD */
 #define SECURITE 0 /* On écrit sur les deux disques systématiquement */ 
 #define ECONOMIE 1 /* On écrit uniquement sur les SSD */
 
+extern node *mapping;
+extern free_sector mem_SSD;
+
 static int mode = SECURITE;
 
 static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
@@ -56,34 +56,50 @@ struct sbd_device {
 /* Structure de notre pilote */
 static struct sbd_device Device;
 
+struct kthread_argument {
+    struct bio* clone;
+    uint64_t sector;    
+};
+
+
 /* fonctions d'aide */
 /* Premier secteur de la dernière ligne utilisable sur le SSD */
+/* multiple de 10 début de la première ligne utilisable */
 u64 compute_last_usable(u64 i){
-	return (u64) floor(i / LINE_SIZE) * LINE_SIZE - LINE_SIZE + 1 ;
+	return (u64) (i - (i % LINE_SIZE) - LINE_SIZE - 1) ;
 }
 
 /* Nombre maximal de lignes pouvant être utilisées sur le SSD */
 u64 compute_max(u64 i){
-	return (u64) floor(i * TAUX_MAX / (LINE_SIZE * 100));
+	return (u64) (i - (i % LINE_SIZE) / LINE_SIZE);
 }
 
 /* Nombre de lignes utilisées sur le SSD en dessous duquel il faut arriver après l'avoir vidé */
 u64 compute_min(u64 i){
-	return (u64) floor(i * TAUX_MIN / (LINE_SIZE * 100));
+	return (u64) (i * TAUX_MIN / (LINE_SIZE * 100));
 }
 
-void ssd_transfer(int sector, struct bio *bio){
+/*Prend une bio et le met sur le SSD*/
+int ssd_transfer(void* data){
+    printk(KERN_WARNING "!!");
+    int sector = ((struct kthread_argument*) data)->sector;
+    struct bio *bio = ((struct kthread_argument*) data)->clone;
+   
 	bio->bi_bdev = Device.target_ssd;
 	bio->bi_sector = sector;
-	generic_make_request(clone);
+	generic_make_request(bio);
+
+    return 0;
 }
 
 /* Fonction appelée lorsque le SSD est trop rempli => transfert d'une partie du SSD vers le HDD */
-void ssd_empty(){
+void ssd_empty(void){
+    printk(KERN_WARNING "!!");
 	node* n = mapping;
 	node* temp = NULL;
 	int nb_to_delete = mem_SSD.occup_max - mem_SSD.occup_min;
-	for (i = 0; i < nb_to_delete; i++) {
+	int i = 0;
+	while (i < nb_to_delete) {
 		temp = n->hh.next;
 		del_node(n);
 		n = temp;
@@ -91,6 +107,7 @@ void ssd_empty(){
 		////rajouter code pour le mode économie
 		free_one_line();
 		/*décaler les pointeurs de mem_SSD */
+		i++;
 	}
 }		
 
@@ -101,62 +118,74 @@ void ssd_empty(){
  */
 static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
+    printk(KERN_WARNING "!!");
+    struct kthread_argument arg;
+	sector_t offset;
+	uint64_t sector;
+	struct bio *clone;
+	node* n;
     int request_type = bio_data_dir(bio);
-    sector_t offset = bio->bi_sector;
-    node* n = find_item(offset);
+    offset = bio->bi_sector;
+    n = find_item(offset);
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
-		int offset = bio->bi_sector;
-		
+
 		if (n == NULL){
 			bio->bi_bdev = Device.target_hdd;
-			struct bio *clone = bio_clone(bio, GFP_KERNEL);
-			sector = alloc_a_line();
-			clone->bi_rw = WRITE;
-		        if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
-   				printk(KERN_WARNING "pthread_create failed");
-			}
-			add_node(offset, sector);
-		} else {
-			bio->bi_bdev = Device.target_ssd;
-			bio->bi_sector = n->lba_ssd;	
-		}
-    } else if (request_type == WRITE){
-	switch (mode) {
-		case SECURITE:
-			printk(KERN_WARNING "Make request : WRITE BEGIN \n");
-			struct bio *clone = bio_clone(bio,GFP_KERNEL);
-			bio->bi_bdev = Device.target_hdd;
-			if (n == NULL) {
-				sector = alloc_a_line();
-				if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
-   					printk(KERN_WARNING "pthread_create failed");
-				}
-				add_node(offset, sector);
-			} else {
-				if (pthread_create(&thread, NULL, ssd_transfer, sector, clone)) {
-   					printk(KERN_WARNING "pthread_create failed");
-				}	
-				printk(KERN_WARNING "Make request : WRITE END \n");
-			}
-			break;
-		case ECONOMIE:
+			clone = bio_clone(bio, GFP_KERNEL);
 			sector = get_line();
-			if (pthread_create(&thread, NULL, ssd_transfer, sector, bio)) {
-   				printk(KERN_WARNING "pthread_create failed");
-			}
-			add_node(offset,sector);
-			break;	
-		default:
-			printk(KERN_WARNING "Make request : Mode inattendu \n");
-			return -1;
-	}
+			clone->bi_rw = WRITE;
+            arg.sector = sector;
+            arg.clone = clone;
+            if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+                printk(KERN_WARNING "pthread_create failed");
+            }
+            add_node(offset, sector);
+        } else {
+            bio->bi_bdev = Device.target_ssd;
+            bio->bi_sector = n->lba_ssd;	
+        }
+    } else if (request_type == WRITE){
+        switch (mode) {
+            case SECURITE:
+                printk(KERN_WARNING "Make request : WRITE BEGIN \n");
+                clone = bio_clone(bio,GFP_KERNEL);
+                arg.clone = clone;
+                bio->bi_bdev = Device.target_hdd;
+                if (n == NULL) {
+                    sector = get_line();
+                    arg.sector = sector;
+                    if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+                        printk(KERN_WARNING "pthread_create failed");
+                    }
+                    add_node(offset, sector);
+                } else {
+                    arg.sector = n->lba_ssd;
+                    if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", n->lba_ssd)) {
+                        printk(KERN_WARNING "pthread_create failed");
+                    }
+                    printk(KERN_WARNING "Make request : WRITE END \n");
+                }
+                break;
+            case ECONOMIE:
+                sector = get_line();
+                arg.sector = sector;
+                if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+                    printk(KERN_WARNING "pthread_create failed");
+                }
+                add_node(offset,sector);
+                break;	
+/*            default:
+                printk(KERN_WARNING "Make request : Mode inattendu \n");
+                // A verifier :
+                return -1; */
+        }
     }
 
-    if(HASH_COUNT(mapping) >= mem_ssd->occupy_max){
-	ssd_empty();
-	}
-	
+    if(HASH_COUNT(mapping) >= mem_SSD.occup_max){
+        ssd_empty();
+    }
+
     return 1;
 }
 
@@ -166,6 +195,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
  * Apparement inutile mais doit etre implémentée.
  */
 int sbd_getgeo(struct block_device * block_device, struct hd_geometry * geo) {
+    printk(KERN_WARNING "!!");
 
     geo->heads = 25;
     geo->sectors = 3;
@@ -192,7 +222,8 @@ static struct block_device_operations sbd_ops = {
  * Gendisk, file de requete, disque cible.
  */
 static int setup_device (struct sbd_device* dev){
-    struct request_queue *q;
+    struct request_queue *q, *q1;
+    u64 disk_size;
 
     dev->target_hdd = vmalloc(sizeof(struct block_device));
 
@@ -221,7 +252,7 @@ static int setup_device (struct sbd_device* dev){
 
     dev->gd = alloc_disk(1); /* Crée la structure et définit le nombre max de minor géré */
     if (!dev->gd){ /* Test pour la création de la structure */
-    printk(KERN_WARNING "alloc_disk FAILED");
+        printk(KERN_WARNING "alloc_disk FAILED");
         return -1;
     }
 
@@ -246,7 +277,7 @@ static int setup_device (struct sbd_device* dev){
     dev->target_ssd = open_by_devnum(MKDEV(MAJOR_SSD,MINOR_SSD), FMODE_READ|FMODE_WRITE|FMODE_EXCL); /*bdget(MKDEV(8,16));*/
 
     if (!dev->target_ssd || !dev->target_ssd->bd_disk){
-    printk(KERN_WARNING "bdget ssd FAILED");
+        printk(KERN_WARNING "bdget ssd FAILED");
         return -1;
     }
     printk(KERN_WARNING "bdget ssd DONE");
@@ -262,9 +293,9 @@ static int setup_device (struct sbd_device* dev){
     printk(KERN_WARNING "bdev_get_queue DONE");
 
     if (q->limits.max_sectors > q1->limits.max_sectors){
-	 printk(KERN_WARNING "setup_device: SSD de taille supérieure au HDD");	
-	 return -1;
-	}
+        printk(KERN_WARNING "setup_device: SSD de taille supérieure au HDD");	
+        return -1;
+    }
     /* 
      * Mise en place des informations de la file de requêtes du gendisk 
      * Elle devra théoriquement cloner celle du SSD
@@ -288,9 +319,9 @@ static int setup_device (struct sbd_device* dev){
     add_disk(dev->gd);
 
     /*On initialise notre structure free_sectors */
-    u64 disk_size = q1->limits.max_sectors;
-    	
-    void init_free_sector(1, occup_max(disk_size), compute_min(disk_size), 11, compute_last_usable(disk_size));
+    disk_size = q1->limits.max_sectors;
+
+    init_free_sector(1, compute_max(disk_size), compute_min(disk_size), 10, compute_last_usable(disk_size));
     printk(KERN_WARNING "add_disk DONE");
 
     return 0;
