@@ -27,6 +27,11 @@ static int MINOR_SSD = 0; /* Minor du disque SSD avec lequel on va dialoguer */
 static int MAJOR_HDD = 7; /* Major du disque HDD avec lequel on va dialoguer */
 static int MINOR_HDD = 1; /* Minor du disque HDD avec lequel on va dialoguer */
 
+module_param (MAJOR_HDD, int, S_IRUGO);
+module_param (MINOR_HDD, int, S_IRUGO);
+module_param (MAJOR_SSD, int, S_IRUGO);
+module_param (MINOR_SSD, int, S_IRUGO);
+
 static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
 
 /* Structure du périphérique à créer. */
@@ -234,7 +239,6 @@ static int __init sbd_init(void) {
  * désinscription du module du kernel.
  */
 static void __exit sbd_exit (void) {
-    printk(KERN_WARNING "lol");
     if (Device.gd){
         /* Supprime toutes les informations associées à la structure gendisk (et
          * donc, au disque). Après cette action, le périphérique ne pourra plus 
@@ -255,13 +259,7 @@ static void __exit sbd_exit (void) {
     if (Device.target_ssd)
         blkdev_put(Device.target_ssd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
     unregister_blkdev(major_num, "pbv"); /* Désactive l'enregistrement auprès du kernel */
-    printk(KERN_WARNING "lol");
 }
 
-/*module_param (MAJOR_HDD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-module_param (MINOR_HDD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-module_param (MAJOR_SSD, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-module_param (MINOR, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-*/
 module_init(sbd_init); /* Initialisation du module */
 module_exit(sbd_exit); /* Désactivation du module */

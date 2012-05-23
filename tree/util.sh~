@@ -1,0 +1,69 @@
+#! /bin/bash
+
+# Configuration
+# A modifier si besoin
+PATH_HDD="/dev/loop0"
+PATH_SSD="/dev/loop1"
+DRIVER_NAME="driver_pbv.ko"
+
+# Vérification de l'existence des disques
+if [ ! -e $PATH_HDD ]; then
+    echo "$PATH_HDD n'existe pas."
+    echo "Abandon."
+    exit 1
+fi
+
+if [ ! -e $PATH_SSD ]; then
+    echo "$PATH_SSD n'existe pas."
+    echo "Abandon."
+    exit 1
+fi
+
+# Vérification de la taille des disques : taille(HDD) > taille(SSD) ?
+size_hdd=$((fdisk -l $PATH_HDD|grep "Disk $PATH_HDD"|cut -d" " -f 5) 2>/dev/null)
+size_ssd=$((fdisk -l $PATH_SSD|grep "Disk $PATH_SSD"|cut -d" " -f 5) 2>/dev/null)
+
+if [ $size_hdd -lt $size_ssd ]; then
+    echo "La taille du premier disque doit être supérieure à celle du second. ($size_hdd < $size_ssd)"
+    echo "Abandon."
+    exit 1
+fi
+
+# Vérification du bon nombre de paramètres
+if [ $# -ne 1 ]; then
+    echo "Usage : $0 {insert|remove}"
+    exit 1
+fi
+
+# Vérification de l'existence du pilote.
+if [ ! -e $DRIVER_NAME ]; then
+    echo "Pilote non trouvé"
+    echo "Abandon."
+    exit 1
+fi
+
+if [ $1 == "insert" ]; then 
+
+    # Vérification que les disques ne sont pas déjà montés. Si c'est le cas,
+    # on informe juste l'utilisateur qu'il va perdre ses données. 
+    if [ "$(mount -l |grep $PATH_HDD)" != "" ]; then
+        echo "Attention : $PATH_HDD est monté !"
+    fi
+    
+    if [ $(mount -l |grep $PATH_SSD) != "" ]; then
+        echo "Attention : $PATH_SSD est monté !"
+    fi
+
+    major_hdd=$(ls -l $PATH_HDD|cut -d" " -f 5|cut -d"," -f 1)
+    minor_hdd=$(ls -l $PATH_HDD|cut -d" " -f 6)
+    major_ssd=$(ls -l $PATH_SSD|cut -d" " -f 5|cut -d"," -f 1)
+    minor_ssd=$(ls -l $PATH_SSD|cut -d" " -f 6)
+
+    insmod $DRIVER_NAME MAJOR_HDD=$major_hdd MINOR_HDD=$minor_hdd MAJOR_SSD=$major_ssd MINOR_SSD=$minor_ssd
+
+elif [ $1 == "remove" ]; then
+    rmmod $DRIVER_NAME
+else 
+    echo "Wrong parameter"
+    exit 1
+fi

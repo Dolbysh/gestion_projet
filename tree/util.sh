@@ -43,6 +43,17 @@ if [ ! -e $DRIVER_NAME ]; then
 fi
 
 if [ $1 == "insert" ]; then 
+
+    # Vérification que les disques ne sont pas déjà montés. Si c'est le cas,
+    # on informe juste l'utilisateur qu'il va perdre ses données. 
+    if [ "$(mount -l |grep $PATH_HDD)" != "" ]; then
+        echo "Attention : $PATH_HDD est monté !"
+    fi
+    
+    if [ "$(mount -l |grep $PATH_SSD)" != "" ]; then
+        echo "Attention : $PATH_SSD est monté !"
+    fi
+
     major_hdd=$(ls -l $PATH_HDD|cut -d" " -f 5|cut -d"," -f 1)
     minor_hdd=$(ls -l $PATH_HDD|cut -d" " -f 6)
     major_ssd=$(ls -l $PATH_SSD|cut -d" " -f 5|cut -d"," -f 1)

@@ -82,7 +82,7 @@ struct kthread_argument {
 };
 
 /*Prend une bio et le met sur le SSD*/
-int ssd_transfer(int sector, struct bio* bio){
+int ssd_transfer(sector_t sector, struct bio* bio){
 
     bio->bi_bdev = Device.target_ssd;
     bio->bi_sector = sector;
@@ -109,10 +109,8 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
             bio->bi_bdev = Device.target_hdd;
             clone = bio_clone(bio, GFP_KERNEL);
             sector = get_ran_lba();
-            printk(KERN_WARNING "LBA %llu\n", sector);
+            printk(KERN_WARNING "Mapping NULL : LBA %llu\n", sector);
             clone->bi_rw = WRITE;
-            arg.sector = sector;
-            arg.clone = clone;
             ssd_transfer(sector, clone);
 /*            if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                 printk(KERN_WARNING "pthread_create failed");
@@ -121,6 +119,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
         } else {
             bio->bi_bdev = Device.target_ssd;
             bio->bi_sector = n->lba_ssd;	
+            printk(KERN_WARNING "Mapping non-NULL : LBA %llu\n", bio->bi_sector);
         }
     } else if (request_type == WRITE){
         switch (mode) {
@@ -130,31 +129,31 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 bio->bi_bdev = Device.target_hdd;
                 if (n == NULL) {
                     sector = get_ran_lba();
-            printk(KERN_WARNING "LBA %llu\n", sector);
+                    printk(KERN_WARNING " Mapping NULL : LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
-/*                    if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
-                        printk(KERN_WARNING "pthread_create failed");
-                    } */
+                    /*if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
+                          printk(KERN_WARNING "pthread_create failed");
+                      } */
                     add_node(offset, sector);
                 } else {
                     sector = n->lba_ssd;
-            printk(KERN_WARNING "LBA %llu\n", sector);
+                    printk(KERN_WARNING "LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
                     /*
-                    if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", n->lba_ssd)) {
-                        printk(KERN_WARNING "pthread_create failed");
-                    }*/
+                       if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", n->lba_ssd)) {
+                       printk(KERN_WARNING "pthread_create failed");
+                       }*/
                     printk(KERN_WARNING "Make request : WRITE END \n");
                 }
                 break;
             case ECONOMIE:
                 sector = get_ran_lba();
-            printk(KERN_WARNING "LBA %llu\n", sector);
-            ssd_transfer(sector, clone);
-            /*
-                if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
-                    printk(KERN_WARNING "pthread_create failed");
-                }*/
+                printk(KERN_WARNING "LBA %llu\n", sector);
+                ssd_transfer(sector, clone);
+                /*
+                   if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
+                   printk(KERN_WARNING "pthread_create failed");
+                   }*/
                 add_node(offset,sector);
                 break;	
             default:
@@ -169,7 +168,6 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 /* 
  * Fonction spécifiant les informations à propos de la géométrie du disque
  * dur (virtuel ou non) pour les utiliser (e.g.  fdisk).
- * Apparement inutile mais doit etre implémentée.
  */
 int sbd_getgeo(struct block_device * block_device, struct hd_geometry * geo) {
 

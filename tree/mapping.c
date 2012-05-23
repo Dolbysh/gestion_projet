@@ -13,9 +13,10 @@ void add_node(uint64_t lba_hdd, uint64_t lba_ssd) {
     s = vmalloc(sizeof(node));
 
     if(s == NULL){
-        printk(KERN_WARNING "Could not allocate");
+        printk(KERN_WARNING "Could not allocate\n");
         return;
     }
+
     s->lba_ssd = lba_ssd;
     s->lba_hdd = lba_hdd;
     HASH_ADD_INT(mapping, lba_hdd, s); 
