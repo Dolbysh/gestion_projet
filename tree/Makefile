@@ -1,5 +1,5 @@
 obj-m += driver_pbv.o
-driver_pbv-objs += free_sectors.o driver.o mapping.o
+driver_pbv-objs += free_sectors.o driver_fonctionnel.o mapping.o
 
 
 KDIR := /lib/modules/$(shell uname -r)/build

@@ -27,7 +27,6 @@ void add_node(sector_t lba_hdd, sector_t lba_ssd) {
 void del_node(node *n) {
     printk(KERN_WARNING "!!");
     HASH_DEL(mapping, n);
-    HASH_DEL(mapping_ssd, n);
     vfree(n); 
 }
 
