@@ -1,4 +1,5 @@
 #include <asm/uaccess.h>
+#include <asm/div64.h>
 #include <linux/bio.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -49,22 +50,28 @@ static int major_num = 0;
 
 static unsigned int size_ssd;
 
-static uint32_t get_ran_lba(void){
-       uint32_t temp;
-       uint32_t tata;
-       get_random_bytes(&temp, sizeof(temp));
-       printk(KERN_WARNING "%i\n",temp);
-       tata = temp % size_ssd;
-       printk(KERN_WARNING "titi\n");
-       return tata;
+static sector_t get_ran_lba(void){
+    sector_t temp;
+    sector_t tata;
+    get_random_bytes(&temp, sizeof(temp));
+    printk(KERN_WARNING "%llu\n",temp);
+    //tata = do_div(temp, size_ssd);
+    while (temp >= size_ssd)
+        temp -= size_ssd; 
+
+    while (temp < 0)
+        temp += size_ssd;
+//    tata = temp % size_ssd;
+    printk(KERN_WARNING "titi\n");
+    return tata;
 }
 
 /* Structure du périphérique à créer. */
 struct sbd_device {
     struct request_queue *queue; /* File de requêtes */
-	struct gendisk *gd;	/* Cette structure permettra au noyau d'obtenir d'avantages d'informations sur le périphérique à créer */
+    struct gendisk *gd;	/* Cette structure permettra au noyau d'obtenir d'avantages d'informations sur le périphérique à créer */
     struct block_device *target_hdd; /* Disque dur avec lequel nous souhaitons communiquer (HDD pour l'instant) */
-	struct block_device *target_ssd;
+    struct block_device *target_ssd;
 };
 
 /* Structure de notre pilote */
@@ -73,17 +80,17 @@ static struct sbd_device Device;
 /* Allocation aléatoire du SSD => pas besoin de free_sectors.* */
 struct kthread_argument {
     struct bio* clone;
-    uint32_t sector;    
+    sector_t sector;    
 };
 
 /*Prend une bio et le met sur le SSD*/
 int ssd_transfer(void* data){
     int sector = ((struct kthread_argument*) data)->sector;
     struct bio *bio = ((struct kthread_argument*) data)->clone;
-   
-	bio->bi_bdev = Device.target_ssd;
-	bio->bi_sector = sector;
-	generic_make_request(bio);
+
+    bio->bi_bdev = Device.target_ssd;
+    bio->bi_sector = sector;
+    generic_make_request(bio);
 
     return 0;
 }
@@ -92,21 +99,21 @@ int ssd_transfer(void* data){
 static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
     struct kthread_argument arg;
-	uint32_t offset;
-	uint32_t sector;
-	struct bio *clone;
-	node* n;
+    sector_t offset;
+    sector_t sector;
+    struct bio *clone;
+    node* n;
     int request_type = bio_data_dir(bio);
     offset = bio->bi_sector;
     n = find_item(offset);
     if (request_type == READ){
         printk(KERN_WARNING "Make request : READ \n");
 
-		if (n == NULL){
-			bio->bi_bdev = Device.target_hdd;
-			clone = bio_clone(bio, GFP_KERNEL);
-			sector = get_ran_lba();
-			clone->bi_rw = WRITE;
+        if (n == NULL){
+            bio->bi_bdev = Device.target_hdd;
+            clone = bio_clone(bio, GFP_KERNEL);
+            sector = get_ran_lba();
+            clone->bi_rw = WRITE;
             arg.sector = sector;
             arg.clone = clone;
             if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
@@ -283,9 +290,9 @@ static int setup_device (struct sbd_device* dev){
 
     /* Ajoute le gd aux disques actifs. Il pourra être manipulé par le système */
     add_disk(dev->gd);
-    
+
     size_ssd = q1->limits.max_sectors;
-	
+
     printk(KERN_WARNING "add_disk DONE");
 
     return 0;

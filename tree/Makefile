@@ -1,5 +1,5 @@
 obj-m += driver_pbv.o
-driver_pbv-objs += free_sectors.o driver_fonctionnel.o mapping.o
+driver_pbv-objs += free_sectors.o driver.o mapping.o
 
 
 KDIR := /lib/modules/$(shell uname -r)/build
@@ -10,8 +10,7 @@ loop1_attached := $(shell losetup -a|grep /dev/loop1|wc -l)
 
 default:
 	dd if=/dev/zero of=test_hdd bs=512 count=200000 && dd if=/dev/zero of=test_ssd bs=512 count=20048
-	mke2fs -F test_hdd && mke2fs -F test_ssd
-	losetup /dev/loop0 test_ssd && losetup /dev/loop1 test_hdd
+	losetup /dev/loop0 test_hdd && losetup /dev/loop1 test_ssd
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
 clean:
