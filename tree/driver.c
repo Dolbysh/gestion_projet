@@ -16,9 +16,10 @@
 #include <linux/kdev_t.h>
 #include <linux/timer.h>
 #include "mapping.h"
-#include "free_sectors.h"
+#include <linux/random.h>
+/*#include "free_sectors.h"*/
 
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL");
 
 
 #define LINE_SIZE 1 /* Taille d'une ligne */
@@ -39,11 +40,24 @@ on doit revenir lors d'une procédure de vidage du SSD */
 #define ECONOMIE 1 /* On écrit uniquement sur les SSD */
 
 extern node *mapping;
-extern free_sector mem_SSD;
+//extern free_sector mem_SSD;
 
 static int mode = SECURITE;
 
-static int major_num = 0; /* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
+/* Numéro major désignant le driver. 0 -> Attribution automatique par le noyau. */
+static int major_num = 0; 
+
+static unsigned int size_ssd;
+
+static uint32_t get_ran_lba(void){
+       uint32_t temp;
+       uint32_t tata;
+       get_random_bytes(&temp, sizeof(temp));
+       printk(KERN_WARNING "%i\n",temp);
+       tata = temp % size_ssd;
+       printk(KERN_WARNING "titi\n");
+       return tata;
+}
 
 /* Structure du périphérique à créer. */
 struct sbd_device {
@@ -56,32 +70,14 @@ struct sbd_device {
 /* Structure de notre pilote */
 static struct sbd_device Device;
 
+/* Allocation aléatoire du SSD => pas besoin de free_sectors.* */
 struct kthread_argument {
     struct bio* clone;
-    uint64_t sector;    
+    uint32_t sector;    
 };
-
-
-/* fonctions d'aide */
-/* Premier secteur de la dernière ligne utilisable sur le SSD */
-/* multiple de 10 début de la première ligne utilisable */
-u64 compute_last_usable(u64 i){
-	return (u64) (i - (i % LINE_SIZE) - LINE_SIZE - 1) ;
-}
-
-/* Nombre maximal de lignes pouvant être utilisées sur le SSD */
-u64 compute_max(u64 i){
-	return (u64) (i - (i % LINE_SIZE) / LINE_SIZE);
-}
-
-/* Nombre de lignes utilisées sur le SSD en dessous duquel il faut arriver après l'avoir vidé */
-u64 compute_min(u64 i){
-	return (u64) (i * TAUX_MIN / (LINE_SIZE * 100));
-}
 
 /*Prend une bio et le met sur le SSD*/
 int ssd_transfer(void* data){
-    printk(KERN_WARNING "!!");
     int sector = ((struct kthread_argument*) data)->sector;
     struct bio *bio = ((struct kthread_argument*) data)->clone;
    
@@ -92,36 +88,12 @@ int ssd_transfer(void* data){
     return 0;
 }
 
-/* Fonction appelée lorsque le SSD est trop rempli => transfert d'une partie du SSD vers le HDD */
-void ssd_empty(void){
-    printk(KERN_WARNING "!!");
-	node* n = mapping;
-	node* temp = NULL;
-	int nb_to_delete = mem_SSD.occup_max - mem_SSD.occup_min;
-	int i = 0;
-	while (i < nb_to_delete) {
-		temp = n->hh.next;
-		del_node(n);
-		n = temp;
-		if (n == NULL) break;
-		////rajouter code pour le mode économie
-		free_one_line();
-		/*décaler les pointeurs de mem_SSD */
-		i++;
-	}
-}		
 
-/* 
- * Fonction permettant de rediriger la requête en remplaçant le pilote qui 
- * traitera la bio.
- * Cette fonction est appellée implicitement par le noyau
- */
 static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 {
-    printk(KERN_WARNING "!!");
     struct kthread_argument arg;
-	sector_t offset;
-	uint64_t sector;
+	uint32_t offset;
+	uint32_t sector;
 	struct bio *clone;
 	node* n;
     int request_type = bio_data_dir(bio);
@@ -133,11 +105,11 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
 		if (n == NULL){
 			bio->bi_bdev = Device.target_hdd;
 			clone = bio_clone(bio, GFP_KERNEL);
-			sector = get_line();
+			sector = get_ran_lba();
 			clone->bi_rw = WRITE;
             arg.sector = sector;
             arg.clone = clone;
-            if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+            if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                 printk(KERN_WARNING "pthread_create failed");
             }
             add_node(offset, sector);
@@ -153,9 +125,9 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 arg.clone = clone;
                 bio->bi_bdev = Device.target_hdd;
                 if (n == NULL) {
-                    sector = get_line();
+                    sector = get_ran_lba();
                     arg.sector = sector;
-                    if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+                    if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                         printk(KERN_WARNING "pthread_create failed");
                     }
                     add_node(offset, sector);
@@ -168,24 +140,19 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 }
                 break;
             case ECONOMIE:
-                sector = get_line();
+                sector = get_ran_lba();
                 arg.sector = sector;
-                if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", sector)) {
+                if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                     printk(KERN_WARNING "pthread_create failed");
                 }
                 add_node(offset,sector);
                 break;	
-/*            default:
+            default:
                 printk(KERN_WARNING "Make request : Mode inattendu \n");
                 // A verifier :
-                return -1; */
+                return -1;
         }
     }
-
-    if(HASH_COUNT(mapping) >= mem_SSD.occup_max){
-        ssd_empty();
-    }
-
     return 1;
 }
 
@@ -195,7 +162,6 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
  * Apparement inutile mais doit etre implémentée.
  */
 int sbd_getgeo(struct block_device * block_device, struct hd_geometry * geo) {
-    printk(KERN_WARNING "!!");
 
     geo->heads = 25;
     geo->sectors = 3;
@@ -223,7 +189,7 @@ static struct block_device_operations sbd_ops = {
  */
 static int setup_device (struct sbd_device* dev){
     struct request_queue *q, *q1;
-    u64 disk_size;
+    //u64 disk_size;
 
     dev->target_hdd = vmalloc(sizeof(struct block_device));
 
@@ -317,11 +283,9 @@ static int setup_device (struct sbd_device* dev){
 
     /* Ajoute le gd aux disques actifs. Il pourra être manipulé par le système */
     add_disk(dev->gd);
-
-    /*On initialise notre structure free_sectors */
-    disk_size = q1->limits.max_sectors;
-
-    init_free_sector(1, compute_max(disk_size), compute_min(disk_size), 10, compute_last_usable(disk_size));
+    
+    size_ssd = q1->limits.max_sectors;
+	
     printk(KERN_WARNING "add_disk DONE");
 
     return 0;
