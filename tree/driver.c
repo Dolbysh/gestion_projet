@@ -25,7 +25,7 @@ MODULE_LICENSE("GPL");
 
 #define LINE_SIZE 1 /* Taille d'une ligne */
 #define TAUX_MIN 70 /* Taux d'occupation au dessous duquel 
-on doit revenir lors d'une procédure de vidage du SSD */
+                       on doit revenir lors d'une procédure de vidage du SSD */
 #define TAUX_MAX 90 /* Taux d'occupation maximal du SSD */
 
 #define MAJOR_SSD 7 /* Major du disque SSD avec lequel on va dialoguer */
@@ -57,10 +57,10 @@ static sector_t get_ran_lba(void){
     if(cpt_lba >= size_ssd)
         cpt_lba= 0;
 
-/*    sector_t temp;
-    get_random_bytes(&temp, sizeof(temp));
-    printk(KERN_WARNING "%llu\n",temp);
-*/
+    /*    sector_t temp;
+          get_random_bytes(&temp, sizeof(temp));
+          printk(KERN_WARNING "%llu\n",temp);
+          */
     return cpt_lba;
 }
 
@@ -109,12 +109,16 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
             bio->bi_bdev = Device.target_hdd;
             clone = bio_clone(bio, GFP_KERNEL);
             sector = get_ran_lba();
+            n = find_item_ssd(sector);
+
+            if (n != NULL)
+                del_node(n);
             printk(KERN_WARNING "Mapping NULL : LBA %llu\n", sector);
             clone->bi_rw = WRITE;
             ssd_transfer(sector, clone);
-/*            if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
-                printk(KERN_WARNING "pthread_create failed");
-            } */
+            /* if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
+               printk(KERN_WARNING "pthread_create failed");
+               } */
             add_node(offset, sector);
         } else {
             bio->bi_bdev = Device.target_ssd;
@@ -132,7 +136,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                     printk(KERN_WARNING " Mapping NULL : LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
                     /*if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
-                          printk(KERN_WARNING "pthread_create failed");
+                      printk(KERN_WARNING "pthread_create failed");
                       } */
                     add_node(offset, sector);
                 } else {
