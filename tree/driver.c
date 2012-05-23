@@ -49,21 +49,19 @@ static int mode = SECURITE;
 static int major_num = 0; 
 
 static unsigned int size_ssd;
+static sector_t cpt_lba;
 
 static sector_t get_ran_lba(void){
-    sector_t temp;
-    sector_t tata;
+    cpt_lba++;
+
+    if(cpt_lba >= size_ssd)
+        cpt_lba= 0;
+
+/*    sector_t temp;
     get_random_bytes(&temp, sizeof(temp));
     printk(KERN_WARNING "%llu\n",temp);
-    //tata = do_div(temp, size_ssd);
-    while (temp >= size_ssd)
-        temp -= size_ssd; 
-
-    while (temp < 0)
-        temp += size_ssd;
-//    tata = temp % size_ssd;
-    printk(KERN_WARNING "titi\n");
-    return tata;
+*/
+    return cpt_lba;
 }
 
 /* Structure du périphérique à créer. */
@@ -84,9 +82,7 @@ struct kthread_argument {
 };
 
 /*Prend une bio et le met sur le SSD*/
-int ssd_transfer(void* data){
-    int sector = ((struct kthread_argument*) data)->sector;
-    struct bio *bio = ((struct kthread_argument*) data)->clone;
+int ssd_transfer(int sector, struct bio* bio){
 
     bio->bi_bdev = Device.target_ssd;
     bio->bi_sector = sector;
@@ -116,9 +112,10 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
             clone->bi_rw = WRITE;
             arg.sector = sector;
             arg.clone = clone;
-            if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
+            ssd_transfer(sector, clone);
+/*            if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                 printk(KERN_WARNING "pthread_create failed");
-            }
+            } */
             add_node(offset, sector);
         } else {
             bio->bi_bdev = Device.target_ssd;
@@ -129,29 +126,31 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
             case SECURITE:
                 printk(KERN_WARNING "Make request : WRITE BEGIN \n");
                 clone = bio_clone(bio,GFP_KERNEL);
-                arg.clone = clone;
                 bio->bi_bdev = Device.target_hdd;
                 if (n == NULL) {
                     sector = get_ran_lba();
-                    arg.sector = sector;
-                    if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
+                    ssd_transfer(sector, clone);
+/*                    if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                         printk(KERN_WARNING "pthread_create failed");
-                    }
+                    } */
                     add_node(offset, sector);
                 } else {
-                    arg.sector = n->lba_ssd;
+                    sector = n->lba_ssd;
+                    ssd_transfer(sector, clone);
+                    /*
                     if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", n->lba_ssd)) {
                         printk(KERN_WARNING "pthread_create failed");
-                    }
+                    }*/
                     printk(KERN_WARNING "Make request : WRITE END \n");
                 }
                 break;
             case ECONOMIE:
                 sector = get_ran_lba();
-                arg.sector = sector;
+            ssd_transfer(sector, clone);
+            /*
                 if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                     printk(KERN_WARNING "pthread_create failed");
-                }
+                }*/
                 add_node(offset,sector);
                 break;	
             default:
