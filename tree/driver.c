@@ -49,7 +49,7 @@ static int mode = SECURITE;
 static int major_num = 0; 
 
 static unsigned int size_ssd;
-static sector_t cpt_lba;
+static sector_t cpt_lba =0;
 
 static sector_t get_ran_lba(void){
     cpt_lba++;
@@ -109,6 +109,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
             bio->bi_bdev = Device.target_hdd;
             clone = bio_clone(bio, GFP_KERNEL);
             sector = get_ran_lba();
+            printk(KERN_WARNING "LBA %llu\n", sector);
             clone->bi_rw = WRITE;
             arg.sector = sector;
             arg.clone = clone;
@@ -129,6 +130,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 bio->bi_bdev = Device.target_hdd;
                 if (n == NULL) {
                     sector = get_ran_lba();
+            printk(KERN_WARNING "LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
 /*                    if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
                         printk(KERN_WARNING "pthread_create failed");
@@ -136,6 +138,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                     add_node(offset, sector);
                 } else {
                     sector = n->lba_ssd;
+            printk(KERN_WARNING "LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
                     /*
                     if (kthread_create(ssd_transfer, &arg, "make_request_T%llu\n", n->lba_ssd)) {
@@ -146,6 +149,7 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 break;
             case ECONOMIE:
                 sector = get_ran_lba();
+            printk(KERN_WARNING "LBA %llu\n", sector);
             ssd_transfer(sector, clone);
             /*
                 if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {
@@ -290,7 +294,7 @@ static int setup_device (struct sbd_device* dev){
     /* Ajoute le gd aux disques actifs. Il pourra être manipulé par le système */
     add_disk(dev->gd);
 
-    size_ssd = q1->limits.max_sectors;
+    size_ssd = q1->limits.max_hw_sectors;
 
     printk(KERN_WARNING "add_disk DONE");
 
@@ -354,6 +358,9 @@ static void __exit sbd_exit (void) {
     if (Device.target_ssd)
         blkdev_put(Device.target_ssd, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
     unregister_blkdev(major_num, "pbv"); /* Désactive l'enregistrement auprès du kernel */
+
+    /* Suppression de la table de hash */
+    delete_all();
 }
 
 module_init(sbd_init); /* Initialisation du module */
