@@ -6,8 +6,9 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 static node *mapping = NULL;
+static node *mapping_ssd = NULL;
 
-void add_node(uint64_t lba_hdd, uint64_t lba_ssd) {
+void add_node(sector_t lba_hdd, sector_t lba_ssd) {
     printk(KERN_WARNING "!!");
     node *s;
     s = vmalloc(sizeof(node));
@@ -19,19 +20,28 @@ void add_node(uint64_t lba_hdd, uint64_t lba_ssd) {
 
     s->lba_ssd = lba_ssd;
     s->lba_hdd = lba_hdd;
-    HASH_ADD_INT(mapping, lba_hdd, s); 
+    HASH_ADD(hh, mapping, lba_hdd, sizeof(sector_t), s); 
+    HASH_ADD(hh1, mapping_ssd, lba_ssd, sizeof(sector_t), s); 
 }
 
 void del_node(node *n) {
     printk(KERN_WARNING "!!");
     HASH_DEL(mapping, n);
+    HASH_DEL(mapping_ssd, n);
     vfree(n); 
 }
 
-node* find_item (uint64_t lba_hdd){ 
+node* find_item (sector_t lba_hdd){ 
     printk(KERN_WARNING "!!");
     node *s;
-    HASH_FIND_INT(mapping, &lba_hdd, s);  /* s: output pointer */
+    HASH_FIND(hh, mapping, &lba_hdd, sizeof(sector_t), s);  /* s: output pointer */
+    return s;
+}
+
+node* find_item_ssd(sector_t lba_ssd){
+    printk(KERN_WARNING "!!");
+    node *s;
+    HASH_FIND(hh1, mapping, &lba_ssd, sizeof(sector_t), s);  /* s: output pointer */
     return s;
 }
 

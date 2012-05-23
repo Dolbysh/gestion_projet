@@ -133,6 +133,10 @@ static int passthrough_make_request(struct request_queue *q, struct bio *bio)
                 bio->bi_bdev = Device.target_hdd;
                 if (n == NULL) {
                     sector = get_ran_lba();
+                    n = find_item_ssd(sector);
+
+                    if (n != NULL)
+                        del_node(n);
                     printk(KERN_WARNING " Mapping NULL : LBA %llu\n", sector);
                     ssd_transfer(sector, clone);
                     /*if (kthread_create(ssd_transfer, &arg, "make_request_T%iu\n", sector)) {

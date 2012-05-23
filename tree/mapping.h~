@@ -9,4 +9,5 @@ typedef struct NODE{
 
 void add_node(uint64_t lba_hdd, uint64_t lba_ssd);
 void del_node(node *n);
+void delete_all(void);
 node* find_item(uint64_t lba_hdd);
