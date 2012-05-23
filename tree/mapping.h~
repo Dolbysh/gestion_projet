@@ -5,6 +5,7 @@ typedef struct NODE{
 	uint64_t lba_ssd;
 	uint64_t lba_hdd;
 	UT_hash_handle hh;
+	UT_hash_handle hh1;
 } node ;
 
 void add_node(uint64_t lba_hdd, uint64_t lba_ssd);
