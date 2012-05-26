@@ -1,0 +1,75 @@
+1) Fonctionnement (sorte d'intro)
+2) Initialisation du module
+3) Transfert de requêtes 
+
+Intro
+Au fil de nos recherches et de nos demandes d'assistances, nous avons appris et 
+décidé que notre pilote se contenterait de déléguer les requêtes aux pilotes 
+propres aux disques à "fusionner". Il ne serait donc pas chargé d'écrire ou lire
+lui-même les blocs de données demandées par les processus utilisateurs. Ce système de décision
+sera expliqué plus en détail dans la deuxième partie (traitant de la gestion du cache). 
+Il nous a donc fallu connaître la manière avec laquelle nous pourrions communiquer
+avec le pilote du SSD et avec celui du HDD. Cette situation impliquerait une simulation
+d'agrégat et non une création "réelle".
+Afin de parvenir à nos fins, nous avons eu le choix entre plusieurs solutions : 
+    *Utiliser une librairie telle que "libdevmapper" : cette librairie nous 
+permettait effectivement de créer l'agrégat. Cependant, elle ne nous donnait
+pas la possibilité de choisir entre l'écriture sur le disque dur mécanique ou
+l'écriture sur le SSD. Elle n'était de plus pas adaptée à notre situation puisqu'elle
+utilisait la librairie "glibc", se situant donc dans l'espace utilisateur et non
+dans l'espace noyau. Nous l'avons donc laissée de côté.
+(SCHEMA)
+
+    *Nos recherches suivantes nous ont permis de mettre en évidence quelques fonctions
+et mécanismes qui nous permettraient de rediriger les requêtes reçues par notre pilote.
+C'est donc cette méthode que nous avons retenue, même si elle impliquait beaucoup
+de recherches supplémentaires, notamment sur la structure d'une requête, son traitement
+par le noyau, etc. L'étude du code source de MD, permettant l'utilisation de RAID,
+bien que complexe, ainsi que le "livre Linux Device Driver, 3ème edition" nous ont beaucoup aidés.
+
+Initialisation
+    Comme tout module noyau, notre pilote possède une structure qui lui est propre.
+Elle contient notamment une file de requêtes, une représentation du périphérique qu'il
+va contrôler ainsi que deux structures qui identifieront le SSD d'une part et le HDD
+d'autre part.
+    La représentation du matériel est plus précisement une structure "gendisk" qui
+permettra au noyau de récupérer plus tard l'ensemble des informations propres au
+périphérique virtuel que nous allons créer. On y retrouvera entre autres le numéro
+"major", son numéro "minor" ainsi que la file de requêtes mentionnée précédemment.
+    (SCHEMA détaillant un peu gendisk)
+
+    Les numeros "major" et "minor" forment un couple qui permet d'identifier de manière
+unique un périphérique et son pilote associé. Le premier d'entre eux correspond au
+numéro du pilote et le second le périphérique.
+    Afin d'éviter tout conflit, nous avons attribué la valeur 0 (zéro) à l'identifiant
+du disque; cela indique au noyau qu'il doit le choisir lui-même.
+
+    Lors de son initialisation, notre pilote va donc s'enregistrer auprès du noyau
+grâce à cet identifiant. Mais avant cela, il devra mettre en place tout ce qui lui est nécessaire.
+Ceci inclut sa file de requêtes, leur fonction de traitement, la structure "gendisk" 
+et celles identifiant les disques SSD et HDD.
+    
+
+Traitement de requêtes
+Avant d'expliciter notre algorithme, il faut tout d'abord détailler un peu les structures
+mises en jeu.
+La principale d'entre elles est la structure bio. Celle-ci est une représentation des
+requêtes des périphériques de type bloc. Elle contient en effet, entre autres, le secteur 
+sur lequel elle doit écrire et un pointeur sur le périphérique concerné. Ce sont ces
+deux champs qui vont nous intéresser dans notre traitement des requêtes. En effet,
+l'API du noyau nous permet de ré-implanter une fonction ("make_request") qui va 
+traiter ces requêtes. C'est dans cette fonction que nous allons pouvoir les rediriger
+. Pour ce faire, il faut savoir que si notre fonction retourne une valeur différente
+de 0 (zéro), cela signifie que la requête n'est pas complètement traitée. Le pilote
+sous-jacent sera appelé pour la terminer. 
+Notre travail consistait donc à modifier le champ référençant le périphérique sur 
+lequel lire ou écrire et le remplacer par le SSD ou le HDD, selon les cas, ainsi
+que le secteur sur lequel effectuer cette opération. 
+Cependant ceci ne fonctionnait que dans le cas où il ne fallait transmettre la requête
+qu'à un seul pilote. Dans le cas où il fallait écrire sur les deux disques, il était
+nécessaire de clôner la requête puis de transférer ce clône au pilotes correspondant aux périphérique
+en question grâce à une seconde fonction ("generic_make_request").
+A cela s'ajoutait le mapping, qui allait permettre de déterminer si la requête devait
+être effectuée sur le SSD ou sur le HDD.
+
+
