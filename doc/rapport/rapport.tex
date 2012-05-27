@@ -1,5 +1,3 @@
-% Note Manu : rajouter le fait qu'au lieu de parler de SSD et HDD, on peut se ramener à un
-% cache et à une mémoire principale
 \documentclass[a4paper,10pt]{article}
 \usepackage[utf8x]{inputenc}
 \usepackage[french]{babel}
@@ -7,13 +5,18 @@
 \usepackage{page_garde}
 \usepackage{textcomp}
 \usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{url}
+% \usepackage{graphicx}
 
 %opening
 \title{Périphérique Bloc Virtuel Hybride SSD/HDD}
 \author{Zakaria {\scshape{Addi}} - Baptiste {\scshape{Dolbeau}} - Zineb {\scshape{Issaad}} - Emmanuel {\scshape{Mocquet}} - Claire {\scshape{Smets}}}
 \location {Rouen}
 \blurb{Université de Rouen\\UFR des Sciences et Techniques\\
-    \textbf{Master 1 Sécurité des Systèmes informatiques \\ Projet annuel}
+    \textbf{Master 1 Sécurité des Systèmes Informatiques \\ Projet annuel}\bigskip\\
+    À la demande de : Florent {\scshape{Nicart}}\\
+    Encadrés par : Karim {\scshape{Abdellah Godart}}
 }
 \begin{document}
 \maketitle
@@ -31,9 +34,11 @@ preuve un ancien disque dur IBM à côté d'une clé USB actuelle : chacun a pou
 ne sont comparables.\\
 \end{minipage}\hfill
 \begin{minipage}{0.4\linewidth}
-\begin{flushright}
-\includegraphics[width=4.5cm]{./ibm_hdd.jpg}\end{flushright}
+% \begin{figure}
+\includegraphics[width=4.5cm]{./ibm_hdd.jpg}
 % ibm_hdd.jpg: 450x337 pixel, 72dpi, 15.88x11.89 cm, bb=0 0 450 337
+% \caption{Disque dur IBM 1Go vs clé USB 1Go}
+% \end{figure}
 \end{minipage}
 % Depuis quelques dizaines d'années, le stockage de l'information est de plus en plus optimisé. Il y a encore vingt ans, les disquettes étaient courantes : 
 % et leur capacité très limitée (de 160 Ko à 1 200Ko). Aujourd'hui une nouvelle technologie est elles ont quasiment disparu au profit des clés USB et des disques durs externes.\\
@@ -49,10 +54,10 @@ dont entre autres les disques durs mécaniques (HDD) et les disque à mémoire f
  \hline Consommation en énergie \rule[-0.75cm]{0cm}{1.5cm} & Assez gourmand en énergie : disques à faire tourner & Assez économe : pas de disque à faire tourner. En revanche, il faut 
 alimenter les puces mémoires \\
  \hline Chaleur \rule[-0.5cm]{0cm}{1cm} & Chauffe vite & Chauffe très peu\\
- \hline Prix \rule[-0.5cm]{0cm}{1cm} & Assez peu cher : environ 1\texteuro pour 10 Go & Beaucoup plus cher : actuellement 1\texteuro pour 1Go\\
+ \hline Prix \rule[-0.5cm]{0cm}{1cm} & Assez peu cher : environ 1\texteuro pour 10 Go & Bien plus cher : actuellement environ 2\texteuro pour 1Go\\
  \hline
 \end{tabular}
-
+\bigskip\\
 % \begin{description}
 %  \item [les disques durs mécaniques (HDD) :] qui ont une grande capacité de stockage à moindre coût. Mais le mécanisme est relativement fragile, la consommation 
 % d'énergie est élevée et les temps d'accès sont relativement importants;
@@ -61,115 +66,261 @@ alimenter les puces mémoires \\
 % limité, et le prix d'une telle mémoire est presque dix fois plus cher que pour les disques durs mécaniques. Par conséquent les tailles commercialisées sont 
 % plus limitées.
 % \end{description}
-Il serait donc intéressant de pouvoir allier la rapidité du SSD à la grande capacité des HDD : créer un périphérique de stockage hybride SSD/HDD. C'est un 
-produit déjà existant dans le commerce : une partie mécanique et une partie mémoire flash, le tout dans une seul boîtier et les deux parties étant 
-complémentaires. 
-
+Il serait donc intéressant de pouvoir allier la rapidité du SSD à la grande capacité des HDD : créer un périphérique de stockage hybride SSD/HDD.\medskip\\ 
+Ce type de périphérique alliant la capacité de stockage des HDD et la rapidité des SSD existent déjà dans le commerce. Cependant, à la différence du produit que 
+nous proposons, ceux-ci contiennent les deux types de mémoire dans un seul boîtier.
+\pagebreak
 \section{Description du projet}
 Pour notre projet nous disposons de deux périphériques séparés : un SSD et un HDD et notre logiciel consiste en : 
 \begin{description}
  \item un pilote permettant de relier les deux périphériques entre eux;
  \item un utilitaire permettant à l'utilisateur de maîtriser sa configuration.
 \end{description}
-Dans l'agrégat formé, le SSD jouera le rôle de mémoire cache non volatile : la taille du SSD sera obligatoirement plus petite de celle du HDD, et 
-l'agrégat formé aura la taille du HDD. \\
-Deux stratégies de gestion des disques seront développées : 
-\begin{description}
- \item [le mode économies d'énergie : ] lors de la lecture d'un fichiers, les blocs lus seront importés sur le SSD. Cela permettra un gain de temps lors 
-de la lecture suivante s'ils sont toujours présents sur le SSD. L'écriture se fera sur le SSD puis sur le HDD quand celui-ci sera vidé;
- \item [le mode sécurité :] le lecture se fera de la même façon. Ce sera l'écriture qui se fera de façon différente : elle se fera sur le SSD en 
-priorité, puis sur le HDD en tâche de fond.
-\end{description}
-Lorsque l'espace libre sur le SSD sera inférieur à un certain seuil, une partie du contenu du SSD sera synchronisé avec le HDD puis supprimé du cache.
-Cette tâche sera effectuée en tâche de fond.\bigskip\\
+Dans l'agrégat formé, le SSD joue le rôle de mémoire cache non volatile : la taille du SSD est obligatoirement plus petite de celle du HDD, et 
+l'agrégat formé a la taille du HDD.\medskip \\
+Deux stratégies de gestion du cache auraient dû être développées. La lecture se fait de la même façon pour les deux modes : \\
+si les données sont sur le SSD, les données lui sont directment demandées : 
+\begin{figure}[h]
+  \includegraphics[width=8.5cm]{./lecture_ssd.jpg}
+  \caption{lecture, données présentes sur SSD}
+\end{figure}
+\bigskip\\
+Sinon, les informations sont demandées au HHD puis importées sur le SSD pour une lecture plus rapide les fois suivantes : \\
+\begin{figure}[h]
+  \includegraphics[width=8.5cm]{./lecture_hdd.jpg}
+  \caption{lecture, données non présentes sur SSD}
+\end{figure}
 
-L'utilitaire se charge de la mise en place du "dialogue" entre l'agrégat formé et l'utilisateur du système hybride.\bigskip\\
+Par contre la lecture diffère selon les deux modes : 
+\begin{description}
+ \item [le mode économie d'énergie : ] ce mode n'a pu être implanter. De même que pour la lecture, si les données ne sont pas déjà présentes sur le SSD, 
+elles sont importées puis les modifications sont effectuées :
+\begin{figure}[h]
+ \begin{center}
+  \includegraphics[width=8.5cm]{./ecriture_eco_ssd.jpg}
+  \caption{écriture en mode économie, données présentes sur SSD}
+ \end{center}
+\end{figure}
+\begin{figure}[h]
+ \begin{center}
+  \includegraphics[width=8.5cm]{./ecriture_eco_hdd.jpg}
+  \caption{écriture en mode économie, données non présentes sur SSD}
+ \end{center}
+\end{figure}
+\pagebreak
+ \item [le mode sécurité :] l'écriture se fait systématiquement sur les deux périphériques : 
+\begin{figure}[h]
+ \begin{center}
+  \includegraphics[width=8.5cm]{./ecriture_secu_ssd.jpg}
+  \caption{écriture en mode sécurité, données présentes sur SSD}
+ \end{center}
+\end{figure}
+\begin{figure}[h]
+ \begin{center}
+  \includegraphics[width=8.5cm]{./ecriture_secu_hdd.jpg}
+  \caption{écriture en mode sécurité, données non présentes sur SSD}
+ \end{center}
+\end{figure}
+\end{description}
+Lorsque l'espace libre sur le SSD est inférieur à un certain seuil, une partie du contenu du SSD est synchronisée avec le HDD puis supprimée du cache.
+Cette tâche est effectuée en tâche de fond.\medskip\\
+L'utilitaire se charge de la mise en place du "dialogue" entre l'agrégat formé et l'utilisateur du système hybride.\medskip\\
 Plusieurs commandes sont à la disposition de l'utilisateur : 
 \begin{description}
  \item [formation de l'agrégat :] permet de définir par défaut les deux périphériques à intégrer à l'agrégat;
  \item [activation de l'agrégat :] permet de lancer manuellement l'activation de l'agrégat : les deux périphériques ne forment plus qu'un. SSD et HDD ne 
 forment plus qu'un au vu de l'utilisateur;
  \item [désactivation de l'agrégat :] permet de désactiver l'agrégat : l'utilisateur peut de nouveau voir chacun des deux périphériques;
- \item [choix de la stratégie de gestion du cache :] économies d'énergie ou sécurité (cf opération ci-dessus);
+ \item [choix de la stratégie de gestion du cache :] économie d'énergie ou sécurité (cf opération ci-dessus);
  \item [demande de synchronisation du SSD et du HDD :] permet d'être sûr que toutes les données du SSD sont aussi présentes sur le HDD;
  \item [demande de "flush" :] synchronise le SSD et le HDD puis vide le SSD.
 \end{description}
 
-\section{Première livraison}
-
 \section{Les différentes parties de l'hybridation}
-Notre projet se compose principalement de deux grosses parties : 
+Notre projet se compose principalement de trois grosses parties : 
 \begin{itemize}
- \item la première, très bas niveau, consistant à agréger deux segments de mémoire. Initialement, il était prévu d'agréger un SSD et un HDD. Cepdendant, de 
-nombreuses difficultés ont été rencontrées, et non n'avons pu travailler que sur deux segments de mémoire;
- \item le deuxième, plus haut niveau, consistant à effectuer un mapping entre des deux segements.
+ \item la première, très bas niveau, consistant à agréger les deux périphériques de stockage;
+ \item le deuxième, plus haut niveau, consistant à effectuer un mapping entre des deux segments.
 \end{itemize}
+\medskip
+Faire le lien entre les deux parties (intégration) s'est révélé plus compliqué que prévu : le pilote est dans l'espace noyau, tandis que la partie mapping 
+est dans l'espace client. Nous n'avons pas pu importer certaines librairies (stdlib.h, inttypes.h, ...) et certaines opérations posent problème (la division).
 
 \subsection{Formation de l'agrégat}
 
+\subsubsection{Fonctionnement}
+Au fil de nos recherches et de nos demandes d'assistances, nous avons appris et décidé que notre pilote se contenterait de déléguer les requêtes aux pilotes
+propres aux disques à "fusionner". Il ne serait donc pas chargé d'écrire ou lire lui-même les blocs de données demandées par les processus utilisateurs. Ce 
+système de décision sera expliqué plus en détail dans la deuxième partie (traitant de la gestion du cache).\medskip\\
+Il nous a donc fallu connaître la manière avec laquelle nous pourrions communiquer avec le pilote du SSD et avec celui du HDD. Cette situation impliquerait 
+une simulation d'agrégat et non une création "réelle".\medskip\\
+Afin de parvenir à nos fins, nous avons eu le choix entre plusieurs solutions : la première était d'utiliser une librairie telle que "libdevmapper" : cette 
+librairie nous permettait effectivement de créer l'agrégat. Cependant, elle ne nous donnait pas la possibilité de choisir entre l'écriture sur le disque dur 
+mécanique ou l'écriture sur le SSD. Elle n'était de plus pas adaptée à notre situation puisqu'elle utilisait la librairie "glibc", se situant donc dans 
+l'espace utilisateur et non dans l'espace noyau. Nous l'avons donc laissée de côté.\\
+(SCHEMA)
+\bigskip\\
+Nos recherches suivantes nous ont permis de mettre en évidence quelques fonctions et mécanismes qui nous permettraient de rediriger les requêtes reçues par 
+notre pilote. \medskip\\
+C'est donc cette méthode que nous avons retenue, même si elle impliquait beaucoup de recherches supplémentaires, notamment sur la structure d'une requête, 
+son traitement par le noyau, etc. L'étude du code source de MD, permettant l'utilisation de RAID, bien que complexe, ainsi que le "livre Linux Device Driver, 
+3ème edition" nous ont beaucoup aidés.
+
+\subsubsection{Initialisation du module}
+Comme tout module noyau, notre pilote possède une structure qui lui est propre. Elle contient notamment une file de requêtes, une représentation du 
+périphérique qu'il va contrôler ainsi que deux structures qui identifieront le SSD d'une part et le HDD d'autre part.\medskip\\
+La représentation du matériel est plus précisement une structure "gendisk" qui permettra au noyau de récupérer plus tard l'ensemble des informations propres 
+au périphérique virtuel que nous allons créer. On y retrouvera entre autres le numéro "major", son numéro "minor" ainsi que la file de requêtes mentionnée 
+précédemment.\\
+    (SCHEMA détaillant un peu gendisk)
+\bigskip\\
+Les numeros "major" et "minor" forment un couple qui permet d'identifier de manière unique un périphérique et son pilote associé. Le premier d'entre eux 
+correspond au numéro du pilote et le second le périphérique.\medskip\\
+Afin d'éviter tout conflit, nous avons attribué la valeur 0 (zéro) à l'identifiant du disque; cela indique au noyau qu'il doit le choisir lui-même.
+\medskip\\
+Lors de son initialisation, notre pilote va donc s'enregistrer auprès du noyau grâce à cet identifiant. Mais avant cela, il devra mettre en place tout ce qui 
+lui est nécessaire. Ceci inclut sa file de requêtes, leur fonction de traitement, la structure "gendisk" et celles identifiant les disques SSD et HDD.
+
+\subsubsection{Traitement de requêtes}
+Avant d'expliciter notre algorithme, il faut tout d'abord détailler un peu les structures mises en jeu.\medskip\\
+La principale d'entre elles est la structure bio. Celle-ci est une représentation des requêtes des périphériques de type bloc. Elle contient en effet, entre 
+autres, le secteur sur lequel elle doit écrire et un pointeur sur le périphérique concerné. Ce sont ces deux champs qui vont nous intéresser dans notre 
+traitement des requêtes. En effet, l'API du noyau nous permet de ré-implanter une fonction ("make\_request") qui va traiter ces requêtes. C'est dans cette 
+fonction que nous allons pouvoir les rediriger. Pour ce faire, il faut savoir que si notre fonction retourne une valeur différente de 0 (zéro), cela signifie 
+que la requête n'est pas complètement traitée. Le pilote sous-jacent sera appelé pour la terminer. \medskip\\
+Notre travail consistait donc à modifier le champ référençant le périphérique sur lequel lire ou écrire et le remplacer par le SSD ou le HDD, selon les cas, 
+ainsi que le secteur sur lequel effectuer cette opération. \medskip\\
+Cependant ceci ne fonctionnait que dans le cas où il ne fallait transmettre la requête qu'à un seul pilote. Dans le cas où il fallait écrire sur les deux 
+disques, il était nécessaire de clôner la requête puis de transférer ce clône au pilotes correspondant aux périphériques en question grâce à une seconde 
+fonction ("generic\_make\_request"). \medskip\\
+À cela s'ajoutait le mapping, qui allait permettre de déterminer si la requête devait être effectuée sur le SSD ou sur le HDD.
+
 \subsection{Mapping}
 \paragraph{Pourquoi?}
-Dans notre agrégat, l'un des deux segments de mémoire sert de cache à l'autre. Cependant, comment savoir quelles informations sont sur le cache? \\
-La solution naïve serait de parcourir tous les blocs du cache à la recherche de l'information. Avec beaucoup de chance, elle serait très vite trouvée. Mais 
+Dans notre agrégat, l'un des deux segments de mémoire sert de cache à l'autre. Cependant, comment savoir quelles informations sont sur le cache (SSD)? \\
+\begin{center}
+\begin{figure}[h]
+\includegraphics[width=12cm]{./mapping.jpg}
+% mapping.jpg: 680x369 pixel, 72dpi, 23.99x13.02 cm, bb=0 0 680 369
+\caption{Schéma du mapping}
+\end{figure}
+\end{center}
+
+La solution naïve serait de parcourir tous les blocs du cache à la recherche de l'information. Avec de la chance, elle serait très vite trouvée. Mais 
 il est beaucoup plus probable que l'information ne sera pas immédiatement trouvée, voir même ne sera pas présente dans le cache. Si le cache fait quelques 
 méga-octets cela peut rester envisageable. Mais très vite, avec l'augmentation de la taille du cache, cette solution n'est plus viable.\\
 Pour cela, nous avons dû implanter un mécanisme faisant un compromis entre efficatité temporelle et espace mémoire utilisé. 
 
 \paragraph{Solution apportée}
-Pour cela, nous avons décidé d'utiliser un mécanisme assez connu : les tables de hachage.\\
-Soit h(lab) = y une fonction de hachage prenant en paramètre une adresse et renvoyant la valeur de hache correspondant.\\
+Pour cela, nous avons décidé d'utiliser un mécanisme assez connu : les tables de hashage.\\
+Soit h(lba) = y une fonction de hachage prenant en paramètre une adresse et renvoyant la valeur de hache correspondant.\\
 À chaque information demandée à l'agrégat, celui-ci transmettra la valeur lba et l'entrée correspondante dans la table sera trouvée. À chaque entrée 
 correspondra une liste : la fonction h() produira plusieurs fois la même valeur pour des paramètres différents. En effet, son but est simplement de diminuer 
 le temps de recherche d'une information. Lorsque l'entrée y aura été trouvée, on saura que si l'information est contenue dans la table, c'est à la ligne y. 
-Si l'information n'est pas sur la ligne y, alors elle n'est nulle part dans la table. En supposant que h() soit bien "répartie", le temps de recherche est donc 
-divisé par le nombre d'entrées de la table.
+Si l'information n'est pas sur la ligne y, alors elle n'est nulle part dans la table. En supposant que h() soit bien "répartie", le temps de recherche est 
+donc divisé par le nombre d'entrées de la table.
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=12cm]{./hashage.jpg}
+% hashage.jpg: 578x355 pixel, 72dpi, 20.39x12.52 cm, bb=0 0 578 355
+\caption{Schéma d'une table de hashage}
+\end{center}
+\end{figure}
 
 \paragraph{Implantation}
-Comme dit précédemment, l'implantation ne doit pas être trop gourmande en temps ni en espace. Pour cela, nous avons décidé de ne pas importer des blocs mais 
-des lignes. La taille d'une ligne a été fixée à 100 blocs, ce qui correspond à environ 1 Mo. Lorsqu'une ligne sera stockée dans le cache, une nouvelle cellule 
-sera ajoutée à la table de hachage, en début de liste. Cette cellule comportera : 
+% Comme dit précédemment, l'implantation ne doit pas être trop gourmande en temps ni en espace. Pour cela, nous avons décidé de ne pas importer des blocs mais 
+% des lignes. La taille d'une ligne a été fixée à 100 blocs, ce qui correspond à environ 1 Mo. Lorsqu'une ligne sera stockée dans le cache, une nouvelle cellule 
+% sera ajoutée à la table de hachage, en début de liste. Cette cellule comportera : 
+Pour l'implantation de la table de hashage, nous avons réutilisé une librairie préexistante : uthash. Elle comporte des fonctions telles que l'ajout, la 
+suppression, la recherche, ... d'éléments.
 \begin{itemize}
  \item l'adresse de la ligne sur le cache;
  \item si le bloc a été modifié depuis son importation;
  \item un pointeur vers les autres lignes ayant le même hache;
 \end{itemize}
-Comme mentionné ci-dessus, lorsqu'une ligne est ajoutée au cache, l'insertion se fait en début de liste. Cela permet de ne pas gérer de liste doublement chaînée 
-tout en pouvant supprimer facilement les plus anciennes lignes de la liste.\medskip\\
+Comme mentionné ci-dessus, lorsqu'une ligne est ajoutée au cache, l'insertion se fait en début de liste. Cela permet de ne pas gérer de liste doublement 
+chaînée tout en pouvant supprimer facilement les plus anciennes lignes de la liste.\medskip\\
 La question de l'insertion dans la table de hachage et été résolue. Mais le cache est généralement de taille inférieur à la mémoire principale. Il est donc 
 indispensable de pouvoir vider le cache, au moins partiellement. Il serait très désagréable pour l'utilisateur que ce transfert s'effectue quand il 
 souhaite utiliser l'agrégat. Pour cela, des seuils maximal et minimal sont mis en place : quand le seuil maximal de remplissage est dépacé, le cache se vide 
-jusqu'à ce que le seuil minimal soit atteint. Cette tâche s'effectue en tâche de fond et n'empêche pas l'utilisateur d'utiliser l'agrégat.\\
+jusqu'à ce que le seuil minimal soit atteint. Cette tâche s'effectue en tâche de fond et n'empêche pas l'utilisateur d'utiliser l'agrégat.\medskip\\
 À chaque transfert, ce sont les fins de listes qui sont suprimées de la table. Si la ligne a été modifiée depuis son transfert vers le cache, alors elle est 
 réécrite sur la mémoire principale. Sinon rien n'est écrit.\medskip\\
-Nous avions pensé à des listes doublement chaînées, mais le traitement de la table est lourd à chaque insertion et délétion.
+Nous avions pensé à des listes doublement chaînées, mais le traitement de la table est lourd à chaque insertion et suppression.
 
-\paragraph{Lignes libres sur le cache} 
-Lors de l'importation d'une ligne de la mémoire principale vers le cache, il faut pouvoir désigner l'emplacement à allouer. Le mécanisme n'est pas géré par 
+\subsection{Gestion de l'allocation de l'espace du cache} 
+Lors de l'importation d'un secteur de la mémoire principale vers le cache, il faut pouvoir désigner l'emplacement à allouer. Le mécanisme n'est pas géré par 
 le VFS : nous nous situons à un niveau plus bas.\\
-Deux possibilités ont été examinées pour acéder facilement aux lignes vides : 
+Quatre possibilités ont été examinées pour accéder facilement aux lignes vides : 
 \begin{itemize}
  \item bitmap du cache
- \item liste des lignes libres
+ \item liste des secteurs libres
+ \item allocation aléatoire
+ \item allocation "consécutive"
 \end{itemize}
 \subparagraph{La bitmap} est peu coûteuse en espace ni en temps lorsqu'une ligne est allouée. Mais la recherche d'un ligne vide peut être longue : parcours de 
-la bitmap. Plus le cache est grand, plus le parcours est long.
+la bitmap jusqu'au premier bloc libre indiqué par la bitmap. Plus le cache est grand, plus le parcours est long. 
 
 \subparagraph{La liste des lignes libres} est légèrement plus coûteuse en espace. Mais Lors d'une demande de ligne vide, le temps de réponse est constant. 
-Plus le cache est long, plus la liste est longue et coûteuse en mémoire aussi. Mais chaque cellule de la liste ne comporte que l'adresse de la ligne, donc 
-le coût reste raisonnable.
+Cepdendant, plus le cache est grand, plus la liste est longue et coûteuse en mémoire. Mais chaque cellule de la liste ne comporte que l'adresse du secteur, 
+donc le coût reste raisonnable.
 
+\subparagraph{L'allocation aléatoire} est très peu coûteuse en temps et en espace. Pas de liste de secteurs libres à maintenir à jour, ni de bitmap à 
+parcourir. Cependant, il est possible que certains secteurs utilisés très récemment soient supprimés alors qu'il reste de la place disponible sur le SSD.
+
+\subparagraph{L'allocation "consécutive"} est très peu coûteuse en temps et en espace aussi : il n'y a pas de structure de gestion de la mémoire libre à 
+mettre en place. On essaie d'"ordonner" la mémoire : les secteurs sont alloués à la suite les uns des autres.
+\begin{center}
+ \includegraphics[width=9cm]{./lru3.png}
+% lru3.png: 305x138 pixel, 72dpi, 10.76x4.87 cm, bb=0 0 305 138
+\end{center}
+
+\section{Première livraison}
+Lors de la première livraison, nous avons présenté le squelette de notre actuel pilote : il effectuait des opérations sur un seul segment de mémoire. Il a 
+donc fallu par la suite intégrer deux segments de mémoire, puis remplacer ces segments de mémoire par des périphériques blocs réels.\medskip\\
+Du fait du peu de parties divisibles de notre projet et des difficultés rencontrées, nous n'avons effectué que cette livraison en dehors de la livaison 
+finale.
+
+\section{Difficultés rencontrées}
+\subsection{Programmation noyau}
+La première difficulté rencontrée dans ce projet a été de se familiraiser avec la programmation noyau : en effet les librairies utilisées, la structure et les 
+erreurs de compilations différentes de celles auxquelles nous habitués. \medskip\\
+Pour y remédier, nous avons fourni un important travail de documentation. Mais les informations recherchées étaient très ciblées, ils nous était donc 
+difficile de trouver des réponses à nos questions.
+
+\subsection{Peu d'informations}
+Le "peu d'informations" trouvées sur notre sujet était donc encore un frein à notre progression. \medskip\\
+Lorsque nous avons vu que nous avions pris beaucoup de retard par rapport au planning prévu, nous avons mis en place un plan d'action. Il avait pour but de 
+nous débloquer : nous n'arrivions plus à trouver les informations nécessaires. \medskip\\
+Pour cela, nous avons essayé de contacter des professionnels, et posté des messages sur des forums. Mais les résultats n'ont pas été concluants.\\
+Soit nous n'avons pas eu de réponse, soit elles étaient trop risquées pour nous ou inadaptées à notre situation.
+
+\subsection{Temps imparti}
+Enfin le temps imparti est la dernière grosse difficulté que nous avons essayé de surmonter. Comme dit précédemment, la programmation de module linux était 
+nouvelle pour chacun des membres du groupe. Nous savions que notre projet était réalisable : le module des RAID le fait (md.h) mais il n'était pas possible 
+pour nous d'étudier ce code : beaucoup trop long et complexe en si peu de temps.\medskip\\
+Nous avons donc dû faire la part entre documentation et programmation.
+
+\section{Changement d'objectifs}
 
 \newpage
 \section{Annexes}
-\subsection{Biblographie}
-\begin{itemize}
- \item http://www.2dayblog.com/2007/09/24/the-pass-and-the-present-1gb-drive/
- \item http://www.lostinbrittany.org/blog/2007/11/05/nostalgie-informatique-et-disque-dur-de-10-mo/
- \item http://uthash.sourceforge.net/userguide.html
- \item http://fr.wikipedia.org/wiki/Disque\_dur
+\subsection{Sources}
+\begin{itemize} 
+ \item \url{http://www.2dayblog.com/2007/09/24/the-pass-and-the-present-1gb-drive/}
+ \item \url{http://www.lostinbrittany.org/blog/2007/11/05/nostalgie-informatique-et-disque-dur-de-10-mo/}
+ \item \url{http://uthash.sourceforge.net/userguide.html}
+ \item \url{http://fr.wikipedia.org/wiki/Disque\_dur}
+ \item \url{http://lwn.net/Articles/26404/}
+ \item \url{http://lwn.net/Articles/25415/}
+ \item \url{http://lwn.net/Articles/25711/}
 \end{itemize}
 
 \end{document}
+
+
+
+
 
 
 
